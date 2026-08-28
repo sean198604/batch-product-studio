@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets & local env
+.env
+
+# Runtime data (mounted as Docker volumes)
+data/
+storage/uploads/
+storage/outputs/
+
+# WorkBuddy project memory / tooling metadata (not part of the app)
+.workbuddy/
+
+# Local export test artifacts (contain real usage data)
+_export_test/

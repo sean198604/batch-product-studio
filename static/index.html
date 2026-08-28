@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%234f6ef7%27%2F%3E%3Ccircle%20cx%3D%2721%27%20cy%3D%2712%27%20r%3D%273.2%27%20fill%3D%27%23fff%27%2F%3E%3Cpath%20d%3D%27M4%2024%20L12.5%2014.5%20L17.5%2019.5%20L21.5%2015%20L28%2024%20Z%27%20fill%3D%27%23fff%27%20opacity%3D%270.95%27%2F%3E%3C%2Fsvg%3E" />
+  <title>批量产品场景图生成器</title>
+  <style>
+    /* ====================================================================
+       0. Liquid Glass 设计令牌（按 UI-DESIGN-SYSTEM.md 原样落地）
+       ==================================================================== */
+    :root {
+      --primary: #4f6ef7;
+      --primary-dark: #3d5be5;
+      --danger: #ef4444;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e8ecf2;
+      --bg: #f8fafc;
+
+      --header-h: 64px;
+      --page-max: 1440px;
+
+      /* 液态玻璃核心令牌 */
+      --spring: cubic-bezier(0.32, 0.72, 0, 1);
+      --glass-bg: rgba(255, 255, 255, 0.55);
+      --glass-bg-strong: rgba(255, 255, 255, 0.72);
+      --glass-border: rgba(255, 255, 255, 0.65);
+      --glass-shadow: 0 6px 22px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      --glass-shadow-lg: 0 30px 60px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    /* ====================================================================
+       1. 地基：四角柔光渐变背景（玻璃质感的地基）
+       ==================================================================== */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      line-height: 1.5;
+      color: var(--text-main);
+      background:
+        radial-gradient(1100px 720px at 6% -10%,   #c7d8ff 0%, transparent 55%),
+        radial-gradient(1000px 760px at 104% 2%,   #e6d8ff 0%, transparent 52%),
+        radial-gradient(900px 820px at 90% 104%,   #ffd9e1 0%, transparent 55%),
+        radial-gradient(820px 700px at 4% 102%,    #d4f1e7 0%, transparent 55%),
+        #eef2f8;
+      background-attachment: fixed;
+    }
+
+    /* ====================================================================
+       2. 顶栏 Top Bar（64px 固定毛玻璃栏：半透明白 + 模糊 + 顶部内高光）
+       ==================================================================== */
+    .top-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+      box-shadow: 0 6px 22px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px;
+      z-index: 100;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; }
+    .brand-logo {
+      width: 38px; height: 38px; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; line-height: 1;
+      background: linear-gradient(135deg, #4f6ef7, #818cf8);
+      box-shadow: 0 6px 16px rgba(79, 110, 247, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+    .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .brand-name { font-size: 16px; font-weight: 800; letter-spacing: 0.5px; color: #0f172a; }
+    .brand-sub  { font-size: 10px; font-weight: 400; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; }
+
+    .top-right { display: flex; align-items: center; gap: 12px; }
+    .top-user { font-size: 14px; font-weight: 600; color: #1e293b; }
+    .role-badge {
+      font-size: 10px; font-weight: 600; color: #fff;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      padding: 2px 9px; border-radius: 999px;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+
+    /* ====================================================================
+       3. 导航标签
+       ==================================================================== */
+    .nav { display: flex; gap: 8px; }
+    .nav-tab {
+      appearance: none; border: 0; background: transparent; cursor: pointer;
+      font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text-muted);
+      padding: 7px 16px; border-radius: 12px;
+      transition: color .2s var(--spring), background .2s var(--spring);
+    }
+    .nav-tab:hover { color: var(--primary); background: rgba(79, 110, 247, 0.06); }
+    .nav-tab.active { color: var(--primary); background: rgba(79, 110, 247, 0.08); font-weight: 700; }
+
+    /* ====================================================================
+       4. 布局
+       ==================================================================== */
+    .page-layout {
+      max-width: var(--page-max); margin: 0 auto; padding-top: var(--header-h);
+    }
+    .main-content { padding: 22px 32px 40px; }
+    .view-head { margin: 4px 0 18px; }
+    .view-title { font-size: 21px; font-weight: 800; letter-spacing: 0.3px; color: #0f172a; }
+    .view-sub { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
+
+    /* ====================================================================
+       5. 玻璃卡片
+       ==================================================================== */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 18px 20px;
+      box-shadow: var(--glass-shadow);
+      transition: transform 0.28s var(--spring), box-shadow 0.28s var(--spring), border-color 0.28s;
+      margin-bottom: 16px;
+    }
+    .glass-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(79, 110, 247, 0.35);
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+    .card-title { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; color: #1e293b; margin-bottom: 10px; }
+    .card-sub { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 14px; }
+
+    /* ====================================================================
+       6. 按钮 Buttons（34px / 12px 圆角 / 弹簧位移反馈）
+       ==================================================================== */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      height: 34px; padding: 0 16px; border-radius: 12px;
+      font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+      border: 1px solid transparent; white-space: nowrap;
+      transition: all 0.22s var(--spring);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #4f6ef7, #6f86fa); color: #fff;
+      box-shadow: 0 6px 16px rgba(79, 110, 247, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(79, 110, 247, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+    .btn-primary:active { transform: translateY(0) scale(0.98); }
+    .btn-primary:disabled { opacity: .65; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      color: #475569; border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: var(--glass-shadow);
+    }
+    .btn-ghost:hover { color: var(--primary); border-color: rgba(79, 110, 247, 0.4); background: rgba(255, 255, 255, 0.7); }
+    .btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444, #f87171); color: #fff;
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4); }
+    .btn-danger:active { transform: translateY(0) scale(0.98); }
+
+    .btn-sm { height: 30px; padding: 0 12px; font-size: 13px; }
+
+    /* ====================================================================
+       7. 表单 Form
+       ==================================================================== */
+    .form-row { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
+    .form-row > span { font-size: 13px; font-weight: 600; color: #475569; }
+    textarea, input[type=text], input[type=password] {
+      width: 100%; padding: 11px 14px; border-radius: 12px; font-size: 14px; color: #0f172a;
+      font-family: inherit; border: 1px solid rgba(226, 232, 240, 0.8);
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      transition: border-color 0.2s var(--spring), box-shadow 0.2s var(--spring), background 0.2s;
+      resize: vertical;
+    }
+    textarea:focus, input[type=text]:focus, input[type=password]:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(79, 110, 247, 0.14); background: rgba(255, 255, 255, 0.85);
+    }
+
+    /* API 配置表单（管理后台） */
+    .form-grid { display: grid; grid-template-columns: 2fr 2fr 1.4fr; gap: 14px; }
+    @media (max-width: 720px){ .form-grid { grid-template-columns: 1fr; } }
+    .field { display: flex; flex-direction: column; gap: 7px; }
+    .field-label { font-size: 13px; font-weight: 600; color: #475569; }
+    .api-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+    .api-status { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+    .api-status.ok { color: #16a34a; }
+    .api-status.err { color: #ef4444; }
+
+    /* 模型下拉 / 预设标签（控制台） */
+    .glass-select {
+      width: 100%; padding: 11px 14px; border-radius: 12px; font-size: 14px; color: #0f172a;
+      font-family: inherit; border: 1px solid rgba(226, 232, 240, 0.8);
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      transition: border-color 0.2s var(--spring), box-shadow 0.2s var(--spring), background 0.2s;
+      cursor: pointer;
+    }
+    .glass-select:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(79, 110, 247, 0.14); background: rgba(255, 255, 255, 0.85);
+    }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+    .chip {
+      appearance: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600;
+      padding: 7px 13px; border-radius: 999px; color: #475569;
+      background: rgba(255, 255, 255, 0.55); border: 1px solid rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      box-shadow: var(--glass-shadow);
+      transition: all 0.22s var(--spring);
+    }
+    .chip:hover { color: var(--primary); border-color: rgba(79, 110, 247, 0.4); background: rgba(255, 255, 255, 0.75); transform: translateY(-1px); }
+    .chip:active { transform: translateY(0) scale(0.97); }
+    .chip.active { color: #fff; background: linear-gradient(135deg, #4f6ef7, #6f86fa); border-color: transparent; box-shadow: 0 6px 16px rgba(79, 110, 247, 0.32); }
+    .prompt-note { font-size: 12px; color: #16a34a; margin-top: 6px; font-weight: 500; }
+    .price-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; font-weight: 500; }
+    .price-hint b { color: var(--primary); font-weight: 700; }
+    .model-desc { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.45);
+      border: 1px solid rgba(15,23,42,0.06); font-size: 12.5px; line-height: 1.55; color: var(--text); }
+    .model-desc .md-tag { display: inline-block; font-weight: 700; color: var(--primary); margin-bottom: 2px; }
+    .model-desc .md-desc { color: var(--text-muted); }
+    .env-hint { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text-muted);
+      padding: 8px 11px; border-radius: 11px; background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.22); }
+    .env-hint b { color: #15803d; font-weight: 700; }
+    .env-hint.empty { background: transparent; border: none; padding: 0; }
+
+    /* 预设场景库分组 */
+    .preset-groups { display: flex; flex-direction: column; gap: 12px; margin-top: 2px; }
+    .preset-group .pg-title { font-size: 12.5px; font-weight: 700; color: #475569; margin-bottom: 7px; }
+    /* 任务卡 / 详情里的提示词展示 + 复制 */
+    .task-prompt { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding: 9px 11px; border-radius: 12px;
+      background: rgba(79,110,247,0.06); border: 1px solid rgba(79,110,247,0.16); }
+    .task-prompt .tp-text { flex: 1; font-size: 12px; line-height: 1.5; color: #475569; word-break: break-word; white-space: pre-wrap; }
+    .task-prompt .tp-copy { flex: none; }
+    .cost-line { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
+    .cost-line b { color: #0f172a; font-weight: 700; }
+    .item .cost { font-size: 11.5px; color: var(--primary); font-weight: 700; margin-top: 4px; }
+    .stat-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.6; }
+
+    /* 拖拽上传区（玻璃） */
+    .drop {
+      margin-top: 12px; border: 2px dashed rgba(79, 110, 247, 0.35); border-radius: 14px;
+      padding: 22px; text-align: center; color: var(--text-muted); cursor: pointer;
+      background: rgba(255, 255, 255, 0.45);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      transition: all 0.22s var(--spring);
+    }
+    .drop:hover, .drop.dragover { border-color: var(--primary); color: var(--primary); background: rgba(79, 110, 247, 0.06); transform: translateY(-2px); }
+    .drop strong { font-weight: 700; color: #334155; }
+
+    /* 上传缩略图网格（控制台即时预览） */
+    .thumb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; margin-top: 12px; }
+    .upthumb { position: relative; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.7); box-shadow: var(--glass-shadow); }
+    .upthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .upthumb .x { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; border: none; cursor: pointer; background: rgba(15,23,42,0.6); color: #fff; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; transition: background .2s var(--spring); }
+    .upthumb .x:hover { background: #ef4444; }
+
+    /* ====================================================================
+       8. 状态徽章 / 进度
+       ==================================================================== */
+    .badge { font-size: 10px; font-weight: 600; padding: 2px 9px; border-radius: 8px; white-space: nowrap; }
+    .st-pending    { background: rgba(148, 163, 184, 0.18); color: #94a3b8; }
+    .st-processing { background: rgba(79, 110, 247, 0.14);  color: #4f6ef7; }
+    .st-completed  { background: rgba(34, 197, 94, 0.12);   color: #16a34a; }
+    .st-failed     { background: rgba(239, 68, 68, 0.12);   color: #ef4444; }
+
+    .progress { height: 8px; background: rgba(226, 232, 240, 0.7); border-radius: 999px; overflow: hidden; margin: 12px 0 4px; }
+    .progress > span { display: block; height: 100%; border-radius: 999px;
+      background: linear-gradient(135deg, #4f6ef7, #818cf8);
+      box-shadow: 0 0 8px rgba(79, 110, 247, 0.45); transition: width .45s var(--spring); }
+
+    .hint { font-size: 12.5px; color: #d97706; margin: 8px 0 2px; }
+
+    /* 任务卡 */
+    .task-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .task-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .task-id { font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: 0.3px; }
+    .task-sub { font-size: 12px; color: var(--text-muted); }
+    .task-acts { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+
+    /* 图片网格（Justified 图片墙） */
+    .items { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; margin-top: 14px; }
+    .item {
+      background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.65);
+      border-radius: 14px; padding: 10px; width: 190px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      transition: transform 0.25s var(--spring), box-shadow 0.25s var(--spring);
+    }
+    .item:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12); }
+    .pair { display: flex; gap: 6px; }
+    .pair > div { flex: 1; min-width: 0; }
+    .pair img, .thumb {
+      width: 100%; height: 110px; object-fit: contain; border-radius: 10px; cursor: pointer;
+      background: rgba(248, 250, 255, 0.8); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      transition: transform 0.25s var(--spring);
+    }
+    .pair img:hover, .thumb:hover { transform: scale(1.03); }
+    .placeholder {
+      width: 100%; height: 110px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      background: rgba(248, 250, 255, 0.8); color: var(--text-muted); font-size: 12px;
+    }
+    .item .fn { font-size: 11px; color: var(--text-muted); margin-top: 6px; word-break: break-all; }
+    .item .st { font-size: 11px; font-weight: 600; margin-top: 3px; }
+    .item .err { font-size: 10.5px; color: #ef4444; margin-top: 2px; word-break: break-all; }
+
+    .empty { color: var(--text-muted); text-align: center; padding: 26px 0; font-size: 13px; }
+
+    /* ====================================================================
+       9. 统计看板（玻璃卡内小卡）
+       ==================================================================== */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .stat {
+      background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.65);
+      border-radius: 14px; padding: 18px; text-align: center;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+    .stat .n {
+      font-size: 30px; font-weight: 800; letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #1e293b 20%, #4f6ef7);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .stat .l { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; font-weight: 500; }
+
+    /* 表格 */
+    .table-wrap { overflow-x: auto; border-radius: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid rgba(226, 232, 240, 0.6); text-align: left; }
+    th { color: var(--text-muted); font-weight: 600; font-size: 12px; }
+    tbody tr { transition: background 0.18s var(--spring); }
+    tbody tr:hover { background: rgba(79, 110, 247, 0.05); }
+
+    .pager { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 14px; }
+    .pager .info { font-size: 13px; color: var(--text-muted); }
+
+    /* ====================================================================
+       10. 模态框 Modal
+       ==================================================================== */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(15, 23, 42, 0.28);
+      backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s var(--spring);
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: auto; }
+    /* 登录遮罩从顶栏下方开始：顶栏区域露出真实彩色渐变，标题落在渐变上而非毛玻璃上 */
+    #authOverlay { top: var(--header-h); }
+    .modal-card {
+      background: var(--glass-bg-strong);
+      backdrop-filter: blur(34px) saturate(180%); -webkit-backdrop-filter: blur(34px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 26px;
+      box-shadow: var(--glass-shadow-lg);
+      width: 100%; max-width: 420px; padding: 26px;
+      transform: scale(0.92) translateY(10px); opacity: 0;
+      transition: transform 0.4s var(--spring), opacity 0.35s var(--spring);
+    }
+    .modal-overlay.show .modal-card { transform: scale(1) translateY(0); opacity: 1; }
+    .modal-tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .modal-tabs button {
+      flex: 1; padding: 9px; border: 1px solid rgba(226, 232, 240, 0.8); background: rgba(255, 255, 255, 0.5);
+      border-radius: 12px; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600; color: #475569;
+      transition: all 0.2s var(--spring);
+    }
+    .modal-tabs button.active { background: linear-gradient(135deg, #4f6ef7, #6f86fa); color: #fff; border-color: transparent;
+      box-shadow: 0 6px 16px rgba(79, 110, 247, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+    .modal-tip { font-size: 12.5px; color: var(--text-muted); margin: 10px 0 0; }
+
+    /* ====================================================================
+       11. Toast / Lightbox
+       ==================================================================== */
+    .app-toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(16px);
+      background: rgba(15, 23, 42, 0.88); color: #fff; font-size: 13px; font-weight: 500;
+      padding: 10px 18px; border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25);
+      opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease;
+      z-index: 9999; max-width: 80vw;
+    }
+    .app-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .lightbox {
+      position: fixed; inset: 0; z-index: 300; background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none;
+      transition: opacity 0.25s var(--spring);
+    }
+    .lightbox.show { opacity: 1; pointer-events: auto; }
+    .lb-img { max-width: 88vw; max-height: 84vh; border-radius: 12px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5); }
+    .lb-close {
+      position: absolute; top: 20px; right: 24px; width: 40px; height: 40px; border-radius: 50%;
+      border: none; cursor: pointer; background: rgba(255, 255, 255, 0.15); color: #fff; font-size: 22px;
+      transition: background 0.2s var(--spring);
+    }
+    .lb-close:hover { background: rgba(255, 255, 255, 0.3); }
+
+    /* ====================================================================
+       12. 入场动画 / 响应式 / 无障碍降级
+       ==================================================================== */
+    @keyframes viewFade { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: none; } }
+    .anim-view { animation: viewFade 0.4s var(--spring) both; }
+
+    @media (max-width: 900px) {
+      .top-bar { padding: 0 16px; }
+      .main-content { padding: 18px 16px 36px; }
+      .stats { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .brand-sub { display: none; }
+      .item { width: calc(50% - 4px); }
+    }
+    @media (max-width: 420px) {
+      .item { width: 100%; }
+      .nav-tab { padding: 7px 11px; font-size: 13px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .anim-view, .glass-card, .item, .btn, .nav-tab, .modal-card, .modal-overlay { animation: none; transition: none; }
+    }
+
+    .hidden { display: none !important; }
+
+    /* 全公司图片记录：缩略图单元格 */
+    #adminImgTable .cell-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid rgba(15,23,42,.12); background: #f1f5f9; }
+    #adminImgTable .cell-thumb:hover { box-shadow: 0 0 0 2px #4f6ef7; }
+    #adminImgTable .cell-prompt { max-width: 220px; }
+    .field-inline { font-size: 13px; color: #475569; display: inline-flex; align-items: center; gap: 6px; }
+    .field-inline select { padding: 6px 8px; border-radius: 9px; border: 1px solid rgba(15,23,42,.15); background: #fff; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <!-- 顶栏 -->
+  <header class="top-bar">
+    <div class="brand">
+      <div class="brand-logo">🏞️</div>
+      <div class="brand-text">
+        <span class="brand-name">场景图生成工具</span>
+        <span class="brand-sub">SCENE IMAGE STUDIO</span>
+      </div>
+    </div>
+    <div class="top-right" id="userBox"></div>
+  </header>
+
+  <div class="page-layout">
+    <div class="main-content">
+      <!-- ===== 登录/注册 模态 ===== -->
+      <div class="modal-overlay show" id="authOverlay">
+        <div class="modal-card">
+          <div class="modal-tabs">
+            <button id="tabLogin" class="active" onclick="switchTab('login')">登录</button>
+            <button id="tabReg" onclick="switchTab('reg')">注册</button>
+          </div>
+          <div id="loginForm">
+            <div class="form-row"><span>用户名</span><input type="text" id="loginUser" placeholder="用户名" /></div>
+            <div class="form-row"><span>密码</span><input type="password" id="loginPass" placeholder="密码" /></div>
+            <div style="margin-top:18px;"><button class="btn btn-primary" style="width:100%;" onclick="doLogin()">登录</button></div>
+          </div>
+          <div id="regForm" class="hidden">
+            <div class="form-row"><span>用户名（3-32 位）</span><input type="text" id="regUser" placeholder="用户名" /></div>
+            <div class="form-row"><span>密码（至少 6 位）</span><input type="password" id="regPass" placeholder="密码" /></div>
+            <p class="modal-tip">首位注册的员工将自动成为管理员。</p>
+            <div style="margin-top:14px;"><button class="btn btn-primary" style="width:100%;" onclick="doRegister()">注册</button></div>
+          </div>
+          <div class="modal-tip" id="authMsg" style="margin-top:12px;min-height:14px;"></div>
+        </div>
+      </div>
+
+      <!-- ===== 应用区 ===== -->
+      <div id="appArea" class="hidden">
+        <div class="nav" id="navTabs">
+          <button id="navConsole" class="nav-tab active" onclick="showTab('console')">生成控制台</button>
+          <button id="navHistory" class="nav-tab" onclick="showTab('history')">我的历史</button>
+          <button id="navAdmin" class="nav-tab hidden" onclick="showTab('admin')">管理后台</button>
+        </div>
+
+        <!-- 控制台 -->
+        <div id="tabConsole" class="anim-view">
+          <div class="view-head">
+            <div class="view-title">批量生成控制台</div>
+            <div class="view-sub">上传白底产品图，填入统一的场景提示词，系统将以严格流控（≤8 RPM）依次生成场景图。</div>
+          </div>
+          <div class="glass-card">
+            <div class="card-title">新建生成任务</div>
+            <div class="card-sub">系统会在你提交的提示词基础上 <b>自动注入「保真锁」</b> 与高品质商业摄影修饰词，确保原产品主体 / 材质 / Logo 不变，仅替换背景与环境光影。</div>
+
+            <div class="form-row">
+              <span>生图模型</span>
+              <select id="modelSel" class="glass-select" onchange="updateModelPriceHint()">
+                <option value="">加载中…</option>
+              </select>
+              <div class="price-hint" id="modelPriceHint"></div>
+              <div class="model-desc" id="modelDesc"></div>
+            </div>
+
+            <div class="form-row">
+              <span>生成模式</span>
+              <div class="chip-row" id="modeChips">
+                <button type="button" class="chip active" data-mode="single" onclick="selectMode('single',this)">🅰️ 模式A · 单图批量</button>
+                <button type="button" class="chip" data-mode="multi_angle_fusion" onclick="selectMode('multi_angle_fusion',this)">🅱️ 模式B · 多角度合成</button>
+              </div>
+              <div class="env-hint" id="modeHint"></div>
+            </div>
+
+            <div class="form-row">
+              <span>输出图片比例（比例指引注入提示词，模型自然扩展场景，不再物理塞白边）</span>
+              <div class="chip-row" id="ratioChips">
+                <button type="button" class="chip" data-ratio="" onclick="selectRatio('',this)">原图比例</button>
+                <button type="button" class="chip" data-ratio="1:1" onclick="selectRatio('1:1',this)">1:1 正方</button>
+                <button type="button" class="chip active" data-ratio="4:3" onclick="selectRatio('4:3',this)">4:3 横</button>
+                <button type="button" class="chip" data-ratio="3:4" onclick="selectRatio('3:4',this)">3:4 竖</button>
+                <button type="button" class="chip" data-ratio="16:9" onclick="selectRatio('16:9',this)">16:9 宽屏</button>
+                <button type="button" class="chip" data-ratio="9:16" onclick="selectRatio('9:16',this)">9:16 竖屏</button>
+              </div>
+              <div class="env-hint" id="ratioHint"></div>
+            </div>
+
+            <div class="form-row">
+              <span>高转化预设场景库（点击一键填入，可继续微调）</span>
+              <div class="preset-groups" id="presetGroups"></div>
+            </div>
+
+            <div class="form-row">
+              <span>镜头视角（点击追加 / 取消，作用于提示词末尾）</span>
+              <div class="chip-row" id="lensMods"></div>
+            </div>
+
+            <div class="form-row">
+              <span>光影氛围（点击追加 / 取消，作用于提示词末尾）</span>
+              <div class="chip-row" id="lightMods"></div>
+            </div>
+
+            <div class="form-row"><span>统一场景生成提示词</span>
+              <textarea id="prompt" rows="3" placeholder="例如：将产品放置在现代简约风格的木桌上，自然光从左上方打来，背景虚化绿植，商业产品摄影风格。" oninput="selectedWhiteBg=false"></textarea>
+              <div class="prompt-note">✓ 提交后后端自动注入四层约束：① 主体保真锁 ② 物理防畸变（落地 / 真实比例 / 85mm 透视）③ 你的场景 ④ 商业级画质，无需手动书写。</div>
+            </div>
+            <div class="form-row"><span id="uploadLabel">上传白底产品图（可多选）</span></div>
+            <div class="drop" id="dropZone" onclick="document.getElementById('files').click()">
+              点击选择图片，或将文件拖拽到此（<strong>支持批量</strong>）
+            </div>
+            <input type="file" id="files" multiple accept="image/*" class="hidden" onchange="onFiles(this)" />
+            <div class="thumb-grid" id="thumbGrid"></div>
+            <div class="form-row"><span id="fileCount" style="color:var(--text-muted);"></span></div>
+            <div style="margin-top:14px;"><button class="btn btn-primary" id="submitBtn" onclick="createTask()">开始生成</button></div>
+            <div class="modal-tip" id="createMsg" style="margin-top:10px;min-height:14px;"></div>
+          </div>
+
+          <div class="glass-card" id="consoleProgress" style="display:none;">
+            <div class="card-title">生成进度</div>
+            <div class="task-meta"><span class="task-id" id="cpId"></span> <span id="cpStatus"></span></div>
+            <div class="progress"><span id="cpBar" style="width:0%"></span></div>
+            <div class="cost-line" id="cpInfo" style="margin-top:6px;"></div>
+            <div class="task-acts"><button class="btn btn-ghost btn-sm" onclick="showTab('history')">前往我的历史查看</button></div>
+          </div>
+        </div>
+
+        <!-- 历史 -->
+        <div id="tabHistory" class="hidden anim-view">
+          <div class="view-head">
+            <div class="view-title">我的历史</div>
+            <div class="view-sub">按时间倒序查看你提交过的全部任务，可逐张删除或整体打包下载。</div>
+          </div>
+          <div class="glass-card">
+            <div class="card-title">历史生成记录</div>
+            <div id="historyTasks"><div class="empty">暂无记录</div></div>
+            <div class="pager">
+              <button class="btn btn-ghost btn-sm" id="histPrev" onclick="changeHistPage(-1)">上一页</button>
+              <span class="info" id="histPageInfo"></span>
+              <button class="btn btn-ghost btn-sm" id="histNext" onclick="changeHistPage(1)">下一页</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 管理后台 -->
+        <div id="tabAdmin" class="hidden anim-view">
+          <div class="view-head">
+            <div class="view-title">管理后台</div>
+            <div class="view-sub">全公司用量统计、员工列表与任务治理。</div>
+          </div>
+          <div class="glass-card">
+            <div class="card-title">API 配置</div>
+            <div class="card-sub">在此粘贴 Gemini API Key 与接口地址，保存后立即生效（无需重启）。</div>
+            <div class="form-grid">
+              <label class="field">
+                <span class="field-label">Gemini API Key</span>
+                <input type="password" id="apiKey" placeholder="粘贴你的 Google AI Studio API Key" autocomplete="off"/>
+              </label>
+              <label class="field">
+                <span class="field-label">API 地址（Base URL）</span>
+                <input type="text" id="apiBase" placeholder="https://generativelanguage.googleapis.com/v1beta/models"/>
+              </label>
+              <label class="field">
+                <span class="field-label">生图模型</span>
+                <input type="text" id="apiModel" placeholder="gemini-2.5-flash-image"/>
+              </label>
+            </div>
+            <div class="api-actions">
+              <button class="btn btn-primary btn-sm" onclick="saveApiSettings()">保存配置</button>
+              <button class="btn btn-ghost btn-sm" onclick="testApiSettings()">测试连接</button>
+              <span class="api-status" id="apiStatus"></span>
+            </div>
+            <p class="modal-tip" id="apiKeyHint"></p>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-title">统计看板</div>
+            <div class="stats" id="adminStats"></div>
+          </div>
+          <div class="glass-card">
+            <div class="card-title">员工列表</div>
+            <div class="table-wrap">
+              <table id="userTable"><thead><tr><th>用户名</th><th>角色</th><th>注册时间</th><th>API 调用</th><th>生成图片</th><th>累计消耗(USD)</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+          <div class="glass-card">
+            <div class="card-title">全公司任务</div>
+            <div class="table-wrap">
+              <table id="allTasksTable"><thead><tr><th>任务ID</th><th>提交人</th><th>状态</th><th>进度</th><th>操作</th></tr></thead><tbody></tbody></table>
+            </div>
+            <div class="pager">
+              <button class="btn btn-ghost btn-sm" id="admPrev" onclick="changeAdmPage(-1)">上一页</button>
+              <span class="info" id="admPageInfo"></span>
+              <button class="btn btn-ghost btn-sm" id="admNext" onclick="changeAdmPage(1)">下一页</button>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-title">全公司图片记录</div>
+            <div class="card-sub">逐张查看全公司所有生成图片（含提交人），可按人员筛选并导出。</div>
+            <div class="form-row" style="align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+              <label class="field-inline">人员：
+                <select id="admImgUser" onchange="loadAdminImages(1)">
+                  <option value="">全部人员</option>
+                </select>
+              </label>
+              <button class="btn btn-ghost btn-sm" onclick="exportAdminCsv()">导出 CSV（按人员）</button>
+              <button class="btn btn-ghost btn-sm" onclick="exportAdminZip()">导出图片 ZIP（按人员）</button>
+            </div>
+            <div class="table-wrap">
+              <table id="adminImgTable"><thead><tr><th>提交人</th><th>提示词</th><th>模型</th><th>模式</th><th>状态</th><th>消耗</th><th>时间</th><th>原图</th><th>结果图</th></tr></thead><tbody></tbody></table>
+            </div>
+            <div class="pager">
+              <button class="btn btn-ghost btn-sm" id="admImgPrev" onclick="changeAdmImgPage(-1)">上一页</button>
+              <span class="info" id="admImgPageInfo"></span>
+              <button class="btn btn-ghost btn-sm" id="admImgNext" onclick="changeAdmImgPage(1)">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast / Lightbox -->
+  <div class="app-toast" id="toast"></div>
+  <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+    <button class="lb-close" onclick="closeLightbox(event)">×</button>
+    <img class="lb-img" id="lbImg" src="" alt="预览" />
+  </div>
+
+<script>
+const TOKEN_KEY = "bps_token";
+let meUser = null;
+let selectedFiles = [];        // 每个元素 {file, url}（用于缩略图预览）
+let selectedMode = "single";   // "single" 单图批量 / "multi_angle_fusion" 多角度合成
+let currentTaskId = null;      // 控制台当前正在轮询进度的任务
+let currentTaskPoll = null;
+let histPage = 1;
+let admPage = 1;
+let admImgPage = 1;
+
+function getToken(){ return localStorage.getItem(TOKEN_KEY); }
+function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
+function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
+
+function authHeaders(extra={}){ const h={...extra}; const t=getToken(); if(t) h["Authorization"]="Bearer "+t; return h; }
+function api(method, path, opts={}){
+  const headers = authHeaders(opts.headers||{});
+  let body = opts.body;
+  if(opts.json !== undefined){
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(opts.json);
+  }
+  return fetch(path, { method, headers, body });
+}
+function showAuthMsg(text, isErr){ const el=document.getElementById("authMsg"); el.textContent=text; el.style.color=isErr?"#ef4444":"#16a34a"; }
+function setMsg(id,text,isErr){ const el=document.getElementById(id); el.textContent=text; el.style.color=isErr?"#ef4444":"#16a34a"; }
+function showToast(text){ const el=document.getElementById("toast"); el.textContent=text; el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"), 2400); }
+
+function switchTab(which){
+  document.getElementById("tabLogin").classList.toggle("active", which==="login");
+  document.getElementById("tabReg").classList.toggle("active", which==="reg");
+  document.getElementById("loginForm").classList.toggle("hidden", which!=="login");
+  document.getElementById("regForm").classList.toggle("hidden", which!=="reg");
+}
+
+async function doRegister(){
+  const username=document.getElementById("regUser").value.trim();
+  const password=document.getElementById("regPass").value;
+  if(!username||!password) return showAuthMsg("请输入用户名和密码", true);
+  const res=await fetch("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});
+  if(res.ok){ showAuthMsg("注册成功，请登录", false); switchTab("login"); }
+  else { const e=await res.json().catch(()=>({})); showAuthMsg(e.detail||"注册失败", true); }
+}
+
+async function doLogin(){
+  const username=document.getElementById("loginUser").value.trim();
+  const password=document.getElementById("loginPass").value;
+  if(!username||!password) return showAuthMsg("请输入用户名和密码", true);
+  let res;
+  try {
+    res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({username,password})});
+  } catch(e){
+    return showAuthMsg("无法连接服务器，请确认服务已启动（端口 7021）", true);
+  }
+  if(res.ok){ const d=await res.json(); setToken(d.access_token); await enterApp(); }
+  else if(res.status===401) showAuthMsg("用户名或密码错误", true);
+  else showAuthMsg("登录失败（服务异常，请稍后重试）", true);
+}
+
+async function fetchMe(){
+  const res=await api("GET","/api/auth/me");
+  if(res.ok){ meUser=await res.json(); }
+  else { clearToken(); throw new Error("auth"); }
+}
+
+async function enterApp(){
+  document.getElementById("authOverlay").classList.remove("show");
+  setTimeout(()=>document.getElementById("authOverlay").classList.add("hidden"), 300);
+  document.getElementById("appArea").classList.remove("hidden");
+  try { await fetchMe(); } catch(e){ location.reload(); return; }
+  document.getElementById("userBox").innerHTML =
+    `<span class="top-user">${meUser.username}</span> ${meUser.role==="admin"?'<span class="role-badge">管理员</span>':''} <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>`;
+  document.getElementById("navAdmin").classList.toggle("hidden", meUser.role!=="admin");
+  renderPresetChips();
+  loadConfig();
+  showTab("console");
+  startPolling();
+}
+
+function logout(){ clearToken(); location.reload(); }
+
+function showTab(name){
+  ["console","history","admin"].forEach(t=>{
+    document.getElementById("tab"+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle("hidden", t!==name);
+    document.getElementById("nav"+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle("active", t===name);
+  });
+  const view=document.getElementById("tab"+name.charAt(0).toUpperCase()+name.slice(1));
+  view.classList.remove("anim-view"); void view.offsetWidth; view.classList.add("anim-view");
+  if(name==="history") loadHistory(1);
+  if(name==="admin") loadAdmin();
+}
+
+/* ---------- 控制台 ---------- */
+function onFiles(input){
+  addFiles(Array.from(input.files));
+  input.value="";
+}
+function addFiles(files){
+  const seen = new Set(selectedFiles.map(x => x.file.name + "_" + x.file.size));
+  for(const f of files){
+    const key = f.name + "_" + f.size;
+    if(seen.has(key)) continue;   // 同一文件去重
+    selectedFiles.push({ file: f, url: URL.createObjectURL(f) });
+    seen.add(key);
+  }
+  renderThumbs();
+}
+function renderThumbs(){
+  const grid=document.getElementById("thumbGrid"); grid.innerHTML="";
+  selectedFiles.forEach((x, i)=>{
+    const d=document.createElement("div"); d.className="upthumb";
+    const img=document.createElement("img"); img.src=x.url; img.alt=x.file.name; img.title=x.file.name; img.onclick=()=>openLightbox(x.url);
+    const b=document.createElement("button"); b.className="x"; b.textContent="✕"; b.title="移除该图"; b.onclick=(e)=>{ e.stopPropagation(); removeFile(i); };
+    d.appendChild(img); d.appendChild(b); grid.appendChild(d);
+  });
+  document.getElementById("fileCount").textContent = selectedFiles.length ? `已选择 ${selectedFiles.length} 张图片` : "";
+  updateUploadLabel();
+}
+function removeFile(i){
+  const x=selectedFiles[i]; if(x) URL.revokeObjectURL(x.url);
+  selectedFiles.splice(i, 1); renderThumbs();
+}
+function updateUploadLabel(){
+  const el=document.getElementById("uploadLabel");
+  if(!el) return;
+  el.textContent = selectedMode==="multi_angle_fusion"
+    ? "上传同一产品的多角度图（2~4 张：如正视 / 45° / 细节图）"
+    : "上传白底产品图（可多选）";
+}
+
+// 拖拽支持
+(function(){
+  const dz=document.getElementById("dropZone");
+  ["dragenter","dragover"].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.classList.add("dragover");}));
+  ["dragleave","drop"].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.classList.remove("dragover");}));
+  dz.addEventListener("drop",ev=>{ const f=ev.dataTransfer.files; if(f&&f.length){ addFiles(Array.from(f)); } });
+})();
+
+/* ---------- 生成模式切换 ---------- */
+function selectMode(mode, btn){
+  selectedMode = mode;
+  [...document.getElementById("modeChips").children].forEach(c=>c.classList.toggle("active", c.dataset.mode===mode));
+  const el=document.getElementById("modeHint");
+  if(mode==="multi_angle_fusion"){
+    el.className="env-hint";
+    el.innerHTML="<b>🅱️ 多角度合成模式</b>：上传 2~4 张同一产品的不同角度图，系统一次性提交并融合生成 <b>1 张</b> 统一场景图（产出 1 张）。";
+  } else {
+    el.className="env-hint empty"; el.innerHTML="";
+  }
+  updateUploadLabel();
+}
+
+/* ---------- 预设场景库 / 修饰器 / 模型 ---------- */
+let selectedRatio = "4:3";   // 默认 4:3 横向；'' = 原图比例；其余 '1:1' / '3:4' / '16:9' / '9:16'
+let selectedModifiers = new Set();  // 已选中的镜头 / 光影修饰词（含前导 ", "）
+let selectedWhiteBg = false;  // 纯白底模式：选 A 组纯白预设时为 true，提交时传给后端切换 Layer2/4
+
+// 比例 -> 注入提示词的英文指引（模型据此自然扩展场景以匹配比例，不再物理塞白边）
+const RATIO_PROMPTS = {
+  "1:1":  "composition framed in a 1:1 square aspect ratio",
+  "4:3":  "composition framed in a 4:3 landscape aspect ratio",
+  "3:4":  "composition framed in a 3:4 portrait aspect ratio",
+  "16:9": "composition framed in a 16:9 wide landscape aspect ratio",
+  "9:16": "composition framed in a 9:16 vertical aspect ratio",
+};
+
+// 十大高转化电商预设场景库（分组：纯白规范主图 / 室内家居 / 室外自然与街头）
+const PRESET_GROUPS = [
+  { title:"A · 电商规范主图（纯白系列）", items:[
+    { label:"⚪ 电商纯白底（带真实地影）", white:true, text:"Isolate the product on a completely pure solid white background (RGB 255, 255, 255), seamless studio backdrop, subtle and soft realistic contact shadow underneath the base, professional commercial studio lighting, high-contrast, razor-sharp clean edges, zero background artifacts, crisp 8k e-commerce listing photography." },
+    { label:"✂️ 纯白无影抠图底", white:true, text:"Extract and isolate the exact product onto an absolute pure blank white background (hex #FFFFFF), perfectly flat solid background, no shadows, no reflections, pin-sharp contour edges, clean isolation cutout style." },
+  ]},
+  { title:"B · 室内生活与家居", items:[
+    { label:"🏠 温馨现代室内", text:"placed naturally on a clean neutral-toned tabletop inside a modern cozy interior, soft ambient warm sunlight coming from a nearby window, blurred contemporary home background with subtle aesthetic decor, realistic contact shadows, f/2.8 shallow depth of field." },
+    { label:"🪵 极简原木家居", text:"placed on a natural light-oak wooden table, soft morning sunlight casting gentle shadows, blurred minimalist warm living room background, clean organic texture." },
+    { label:"🏛️ 奢华大理石台面", text:"placed on a smooth white Carrara marble pedestal, luxury bathroom countertop, soft diffused studio lighting, subtle water ripples, elegant high-end commercial ad." },
+    { label:"💼 现代办公桌面", text:"placed on a clean dark grey matte office desk, next to a subtle laptop edge and small succulent plant, modern bright office ambient lighting, crisp focus." },
+  ]},
+  { title:"C · 室外全维度自然与街头", items:[
+    { label:"🌲 自然林间草木", text:"placed securely on a rustic natural stone platform outdoors, surrounded by fresh lush greenery and subtle wild grass, soft golden hour sunlight filtering naturally through the background, authentic outdoor environment with rich atmospheric depth." },
+    { label:"🏖️ 海边沙滩阳光", text:"placed firmly on dry fine golden sand next to a smooth ocean pebble, crisp natural outdoor sunlight from a 45-degree angle casting realistic contact shadows beneath the base, subtle turquoise sea waves and sunny sky gently blurred in the far background." },
+    { label:"🏕️ 户外露营木台", text:"resting naturally on a weathered rustic cedar picnic table, accurate physical scale with realistic wood grain texture, soft ambient daylight filtering through pine trees, subtle pine cones creating scale reference, razor-sharp contact shadows." },
+    { label:"🏙️ 现代街头水泥台", text:"placed securely on a clean industrial architectural concrete ledge outdoors, bright overcast daylight providing balanced natural reflections, blurred modern glass architecture and street trees in the background, sharp grounded shadows." },
+  ]},
+];
+
+// 镜头视角修饰器（点击追加 / 取消，作用于提示词末尾）
+const LENS_MODIFIERS = [
+  { label:"👁️ 经典平视", text:", eye-level front view" },
+  { label:"📐 35°微俯视", text:", 35-degree high-angle commercial product shot" },
+  { label:"🔍 微距特写", text:", close-up macro product lens" },
+];
+// 光影氛围修饰器（点击追加 / 取消，作用于提示词末尾）
+const LIGHT_MODIFIERS = [
+  { label:"☀️ 柔和自然晨光", text:", soft diffused morning sunlight" },
+  { label:"💡 摄影棚专业侧光", text:", professional 45-degree studio side lighting" },
+  { label:"🌇 温暖黄昏光影", text:", warm golden hour sunset lighting" },
+  { label:"⚡ 戏剧感硬光高反差", text:", dramatic high-contrast studio lighting with crisp geometric shadows" },
+];
+
+function selectEnv(){ /* 已弃用：环境分类改由十大预设场景库直接覆盖，保留空函数以兼容旧调用 */ }
+
+/* ---------- 预设场景一键填入 ---------- */
+function getLiteModelId(){
+  // 匹配「3.1 lite」模型（当前为 gemini-3.1-flash-lite-image）；找不到则取目录第一项
+  const c = window.MODEL_CATALOG || [];
+  const hit = c.find(m=>/flash-lite/i.test(m.id));
+  return hit ? hit.id : (c[0] ? c[0].id : "");
+}
+function forceLiteModel(){
+  // 纯白抠图预设默认强制走 3.1 lite 模型；若下拉尚未填充则延后到 loadConfig 应用
+  const lite = getLiteModelId();
+  const sel = document.getElementById("modelSel");
+  if(!sel || !lite) return;
+  if([...sel.options].some(o=>o.value===lite)){ sel.value=lite; updateModelPriceHint(); }
+  else { window._pendingLite = lite; }
+}
+function fillPreset(text, btn, white){
+  const ta=document.getElementById("prompt"); ta.value=text;
+  // 框内容已整体替换为该预设场景，修饰器需复位；比例复位为默认 4:3 横向，避免与旧内容混淆
+  selectedRatio="4:3"; syncRatioChips();
+  const rh=document.getElementById("ratioHint"); rh.className="env-hint empty"; rh.innerHTML="";
+  selectedModifiers.clear();
+  selectedWhiteBg = !!white;  // A 组纯白预设 -> 纯白底模式，后端据此切换 Layer2/4
+  document.querySelectorAll("#lensMods .chip, #lightMods .chip").forEach(c=>c.classList.remove("active"));
+  document.querySelectorAll("#presetGroups .chip").forEach(c=>c.classList.remove("active"));
+  btn.classList.add("active");
+  if(white) forceLiteModel();  // 纯白抠图预设默认强制走 3.1 lite 模型
+  showToast(white ? "已填入纯白底预设（纯白底模式已开启，已默认切换 3.1 Lite 模型）" : "已填入场景预设，可继续微调比例 / 镜头 / 光影");
+}
+
+/* ---------- 镜头 / 光影修饰器（追加 / 取消） ---------- */
+function toggleModifier(text, btn){
+  const ta=document.getElementById("prompt"); let v=ta.value||"";
+  if(v.includes(text)){
+    v=v.split(text).join("").replace(/,\s*,/g,",").replace(/^\s*,\s*/,"").replace(/\s*,\s*$/,"").trim();
+    ta.value=v; btn.classList.remove("active"); selectedModifiers.delete(text);
+  } else {
+    ta.value=(v.trim()? v.trim():"") + text; btn.classList.add("active"); selectedModifiers.add(text);
+  }
+}
+
+/* ---------- 一键复制提示词 ---------- */
+function copyPrompt(text){
+  const t=(text||"").toString();
+  if(!t.trim()) return showToast("该记录暂无提示词");
+  const done=()=>showToast("✓ 已复制提示词");
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done).catch(()=>fallbackCopy(t,done));
+  } else fallbackCopy(t,done);
+}
+function fallbackCopy(text, cb){
+  const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); cb(); } catch(e){ showToast("复制失败，请手动复制"); }
+  document.body.removeChild(ta);
+}
+
+/* ---------- 输出比例 ---------- */
+function selectRatio(ratio, btn){
+  selectedRatio = ratio;
+  [...document.getElementById("ratioChips").children].forEach(c=>c.classList.toggle("active", c.dataset.ratio===ratio));
+  applyRatioToPrompt();
+  const el=document.getElementById("ratioHint");
+  if(!ratio){ el.className="env-hint empty"; el.innerHTML=""; return; }
+  el.className="env-hint";
+  el.innerHTML = `<b>已选「${ratio}」</b>：提交时将在提示词注入比例指引（<i>composition framed in a ${ratio} ...</i>），由模型在生成场景时自然扩展环境以匹配该比例，<b>不再物理塞白边</b>；对应短语已写入上方提示词框。`;
+}
+function syncRatioChips(){
+  [...document.getElementById("ratioChips").children].forEach(c=>c.classList.toggle("active", c.dataset.ratio===selectedRatio));
+}
+
+// 从提示词框移除已有的比例短语（精确匹配整段，避免重复）
+function stripRatioFromPrompt(){
+  const ta=document.getElementById("prompt");
+  let v=(ta.value||"").trim();
+  for(const key of Object.keys(RATIO_PROMPTS)){
+    const t=(RATIO_PROMPTS[key]||"").trim();
+    if(t && v.endsWith(t)){ v=v.slice(0, v.length - t.length).trim(); }
+  }
+  ta.value=v;
+}
+
+// 把当前比例短语写入提示词框（可见、可改）
+function applyRatioToPrompt(){
+  stripRatioFromPrompt();
+  const ta=document.getElementById("prompt");
+  let v=(ta.value||"").trim();
+  if(selectedRatio && RATIO_PROMPTS[selectedRatio]){
+    const t=RATIO_PROMPTS[selectedRatio];
+    v=(v ? v + "\n\n" + t : t);
+  }
+  ta.value=v;
+}
+
+// 注：原「Canvas 白边归一化」已移除——改由比例指引注入提示词，模型自然扩展场景，
+// 避免生硬留白与比例失衡（见 RATIO_PROMPTS 与 createTask）。
+
+function renderPresetChips(){
+  const box=document.getElementById("presetGroups"); box.innerHTML="";
+  PRESET_GROUPS.forEach(g=>{
+    const grp=document.createElement("div"); grp.className="preset-group";
+    const title=document.createElement("div"); title.className="pg-title"; title.textContent=g.title; grp.appendChild(title);
+    const row=document.createElement("div"); row.className="chip-row";
+    g.items.forEach(p=>{
+      const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=p.label;
+      b.onclick=()=>fillPreset(p.text, b, p.white);
+      row.appendChild(b);
+    });
+    grp.appendChild(row); box.appendChild(grp);
+  });
+  const lm=document.getElementById("lensMods"); lm.innerHTML="";
+  LENS_MODIFIERS.forEach(m=>{
+    const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=m.label;
+    b.onclick=()=>toggleModifier(m.text, b);
+    lm.appendChild(b);
+  });
+  const ltm=document.getElementById("lightMods"); ltm.innerHTML="";
+  LIGHT_MODIFIERS.forEach(m=>{
+    const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=m.label;
+    b.onclick=()=>toggleModifier(m.text, b);
+    ltm.appendChild(b);
+  });
+}
+
+async function loadConfig(){
+  try{
+    const r=await api("GET","/api/config");
+    if(r.ok){ const d=await r.json();
+      window.MODEL_CATALOG = d.models || [];
+      const sel=document.getElementById("modelSel");
+      const defaultModel=d.gemini_model;
+      sel.innerHTML="";
+      (window.MODEL_CATALOG).forEach(m=>{
+        const o=document.createElement("option"); o.value=m.id;
+        let txt=m.id;
+        if(m.unit_price_usd!=null) txt+=` · 单价 $${m.unit_price_usd.toFixed(4)}/张`;
+        else txt+=" · 价格未公开";
+        o.textContent=txt; sel.appendChild(o);
+      });
+      if(defaultModel && ![...sel.options].some(o=>o.value===defaultModel)){
+        const o=document.createElement("option"); o.value=defaultModel; o.textContent=defaultModel+"（后台默认）"; sel.appendChild(o);
+      }
+      sel.value = (defaultModel && [...sel.options].some(o=>o.value===defaultModel)) ? defaultModel : (sel.options[0]?.value||"");
+      if(window._pendingLite && [...sel.options].some(o=>o.value===window._pendingLite)){
+        sel.value = window._pendingLite; updateModelPriceHint(); window._pendingLite=null;
+      }
+      updateModelPriceHint();
+    }
+  }catch(e){ /* 配置拉取失败不影响使用，保留默认选项 */ }
+}
+
+function updateModelPriceHint(){
+  const sel=document.getElementById("modelSel");
+  const el=document.getElementById("modelPriceHint");
+  const desc=document.getElementById("modelDesc");
+  if(!el) return;
+  const m=(window.MODEL_CATALOG||[]).find(x=>x.id===sel.value);
+  if(!m){ el.textContent=""; if(desc) desc.innerHTML=""; return; }
+  if(m.unit_price_usd!=null){
+    el.innerHTML=`单价 <b>$${m.unit_price_usd.toFixed(4)}</b> / 张（图生图：含 1 张输入图 + 1 张输出图，约 ¥${m.unit_price_cny.toFixed(3)}）`;
+  } else {
+    el.innerHTML=`该模型官方未公开价格，本次生成不计费。`;
+  }
+  // 模型业务定位 / 适用场景 / 推荐使用时机
+  if(desc){
+    const tag = m.tag ? `<div class="md-tag">${m.tag}</div>` : "";
+    const dsc = m.description ? `<div class="md-desc">${m.description}</div>` : "";
+    desc.innerHTML = tag + dsc;
+  }
+}
+
+async function createTask(){
+  const prompt=document.getElementById("prompt").value.trim();
+  if(!prompt) return setMsg("createMsg","请输入场景提示词",true);
+  if(!selectedFiles.length) return setMsg("createMsg","请至少上传一张图片",true);
+  const model=document.getElementById("modelSel").value;
+  const isFusion = (selectedMode==="multi_angle_fusion");
+  if(isFusion && !(selectedFiles.length>=2 && selectedFiles.length<=4)){
+    return setMsg("createMsg","多角度合成模式需要上传 2~4 张同一产品的不同角度图",true);
+  }
+  const fd=new FormData(); fd.append("prompt",prompt); fd.append("model",model);
+  fd.append("mode", isFusion ? "multi_angle_fusion" : "single");
+  // 纯白底模式：优先取预设标记，否则按框内文本兜底识别 A 组纯白短语，确保手动改写也生效
+  const whiteAuto = /rgb\s*255|pure solid white background|blank white background|#ffffff|white background/i.test(prompt);
+  fd.append("is_white_bg", (selectedWhiteBg || whiteAuto) ? "true" : "false");
+  selectedFiles.forEach(x=>fd.append("files", x.file));
+  const btn=document.getElementById("submitBtn"); btn.disabled=true;
+  try{
+    const res=await api("POST","/api/tasks/create",{body:fd});
+    if(res.status===401){ clearToken(); return location.reload(); }
+    if(!res.ok){ const e=await res.json().catch(()=>({})); return setMsg("createMsg",e.detail||"创建失败",true); }
+    const d=await res.json();
+    setMsg("createMsg", isFusion ? `多角度合成任务已创建：将融合生成 1 张场景图` : `任务已创建：共 ${d.total_count} 张`, false);
+    document.getElementById("prompt").value="";
+    selectedFiles.forEach(x=>URL.revokeObjectURL(x.url));
+    selectedFiles=[]; document.getElementById("files").value=""; renderThumbs();
+    startCurrentTaskPoll(d.id);
+  } finally { btn.disabled=false; }
+}
+
+function badge(status){ const m={pending:["待处理","st-pending"],processing:["处理中","st-processing"],completed:["已完成","st-completed"],failed:["失败","st-failed"]}; const [t,c]=m[status]||["?","st-pending"]; return `<span class="badge ${c}">${t}</span>`; }
+
+// 历史/任务卡片：图片（原图 + 生成图）直接内联渲染，刷新后也能看到
+function renderTaskCard(t, withActions){
+  const card=document.createElement("div"); card.className="glass-card";
+  const head=document.createElement("div"); head.className="task-head";
+  const modeTag = t.mode==="multi_angle_fusion" ? '<span class="badge st-processing">🅱️ 多角度合成</span> ' : '';
+  head.innerHTML=`<div class="task-meta"><span class="task-id">${t.id.slice(0,8)}…</span> ${badge(t.status)} ${modeTag}
+    <span class="task-sub">${t.completed_count}/${t.total_count} 成功 · ${t.failed_count} 失败</span></div>`;
+  card.appendChild(head);
+  const metaBits = [];
+  if(t.cost_usd){ metaBits.push(`消耗 <b>$${t.cost_usd.toFixed(4)}</b>`); }
+  if(t.model){ metaBits.push(t.model); }
+  if(t.is_white_bg){ metaBits.push("⚪ 纯白底模式"); }
+  if(t.env){ metaBits.push(t.env==="indoor" ? "🏠 室内" : "🌿 室外"); }
+  if(metaBits.length){ const c=document.createElement("div"); c.className="cost-line"; c.innerHTML=metaBits.join(" · "); card.appendChild(c); }
+
+  // 提示词展示 + 一键复制（复制的是后端四层完整拼装后的提示词）
+  const fullPrompt = t.full_prompt || t.prompt || "";
+  const shown = (t.prompt || fullPrompt || "(空)").toString();
+  const promptBlock = document.createElement("div"); promptBlock.className="task-prompt";
+  const tpText = document.createElement("span"); tpText.className="tp-text";
+  tpText.textContent = shown.length>200 ? shown.slice(0,200)+"…" : shown;
+  const tpCopy = document.createElement("button"); tpCopy.className="btn btn-ghost btn-sm tp-copy";
+  tpCopy.textContent="复制提示词"; tpCopy.title="复制后端四层完整拼装后的提示词（含系统自动注入的保真/防畸变/画质约束）";
+  tpCopy.onclick=()=>copyPrompt(fullPrompt || shown);
+  promptBlock.appendChild(tpText); promptBlock.appendChild(tpCopy);
+  card.appendChild(promptBlock);
+
+  // 图片网格（原图 + 生成图）直接渲染，刷新后也能看到图片
+  if(t.items && t.items.length){
+    const itemsWrap=document.createElement("div"); itemsWrap.className="items";
+    t.items.forEach(it=>itemsWrap.appendChild(renderItem(it, t.id)));
+    card.appendChild(itemsWrap);
+  }
+
+  if(withActions){
+    const acts=document.createElement("div"); acts.className="task-acts";
+    const dl=document.createElement("button"); dl.className="btn btn-ghost btn-sm"; dl.textContent="下载 ZIP"; dl.onclick=()=>downloadZip(t.id);
+    const del=document.createElement("button"); del.className="btn btn-danger btn-sm"; del.textContent="删除任务"; del.onclick=()=>delTask(t.id);
+    acts.appendChild(dl); acts.appendChild(del); card.appendChild(acts);
+  }
+  return card;
+}
+
+function renderItem(it, taskId){
+  const el=document.createElement("div"); el.className="item";
+  // 原图（多角度合成会包含多张参考图）
+  const origUrls = (it.original_urls && it.original_urls.length) ? it.original_urls : (it.original_url ? [it.original_url] : []);
+  const origHtml = origUrls.map(u=>`<div><img src="${u}" alt="原图" onclick="openLightbox('${u}')"/></div>`).join("");
+  const out=it.output_url?`<img src="${it.output_url}" alt="场景图" onclick="openLightbox('${it.output_url}')"/>`:`<div class="placeholder">${stText(it.status)}</div>`;
+  el.innerHTML=`<div class="pair">${origHtml}<div>${out}</div></div>
+    <div class="fn">${it.original_filename}</div>
+    <div class="st st-${it.status}">${stText(it.status)}</div>
+    ${it.cost_usd?`<div class="cost">$${it.cost_usd.toFixed(4)}</div>`:''}
+    ${it.error_message?`<div class="err" title="${it.error_message}">${(it.error_message||'').slice(0,140)}</div>`:''}`;
+  const del=document.createElement("button"); del.className="btn btn-danger btn-sm"; del.style.marginTop="6px"; del.textContent="删除此图"; del.onclick=()=>delItem(it.id);
+  el.appendChild(del);
+  return el;
+}
+function stText(s){ return {pending:"等待中",processing:"生成中",success:"成功",failed:"失败"}[s]||s; }
+
+/* ---------- 控制台当前任务进度轮询 ---------- */
+function startCurrentTaskPoll(taskId){
+  currentTaskId = taskId;
+  const box=document.getElementById("consoleProgress"); if(box) box.style.display="";
+  const idEl=document.getElementById("cpId"); if(idEl) idEl.textContent=taskId.slice(0,8)+"…";
+  if(currentTaskPoll) clearInterval(currentTaskPoll);
+  currentTaskPoll=setInterval(pollCurrentTask, 2500);
+  pollCurrentTask();
+}
+async function pollCurrentTask(){
+  if(!currentTaskId) return;
+  const res=await api("GET",`/api/tasks/${currentTaskId}`);
+  if(!res.ok) return;
+  const d=await res.json();
+  const st=document.getElementById("cpStatus"); if(st) st.innerHTML=badge(d.status);
+  const bar=document.getElementById("cpBar"); if(bar) bar.style.width=(d.progress_percent||0)+"%";
+  const info=document.getElementById("cpInfo");
+  if(info) info.innerHTML=`${d.completed_count}/${d.total_count} 成功 · ${d.failed_count} 失败` + (d.cost_usd?` · 消耗 <b>$${d.cost_usd.toFixed(4)}</b>`:"");
+  if(d.status==="completed" || d.status==="failed"){
+    if(currentTaskPoll){ clearInterval(currentTaskPoll); currentTaskPoll=null; }
+  }
+}
+
+async function delItem(itemId){
+  if(!confirm("确认删除该图片（物理文件与记录）？")) return;
+  const res=await api("DELETE",`/api/items/${itemId}`);
+  if(res.ok){ showToast("已删除该图片"); loadHistory(histPage); }
+  else showToast("删除失败");
+}
+async function delTask(taskId){
+  if(!confirm("确认删除整个任务及其所有图片（物理文件与记录）？")) return;
+  const res=await api("DELETE",`/api/tasks/${taskId}`);
+  if(res.ok){ showToast("任务已删除"); loadHistory(histPage); }
+  else showToast("删除失败");
+}
+function downloadZip(taskId){
+  fetch(`/api/tasks/${taskId}/download-zip`,{headers:authHeaders()}).then(r=>{ if(!r.ok) throw 0; return r.blob(); })
+    .then(b=>{ const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=`scene_${taskId}.zip`; a.click(); URL.revokeObjectURL(u); })
+    .catch(()=>showToast("下载失败，可能任务尚未完成或已无成功图片。"));
+}
+
+/* ---------- 历史 ---------- */
+async function loadHistory(page){
+  histPage=page;
+  const res=await api("GET",`/api/tasks/my-history?page=${page}&page_size=10`);
+  if(res.status===401){ clearToken(); return location.reload(); }
+  const d=await res.json();
+  const box=document.getElementById("historyTasks");
+  if(!d.items.length){ box.innerHTML='<div class="empty">暂无记录</div>'; }
+  else { box.innerHTML=""; d.items.forEach(t=>box.appendChild(renderTaskCard(t,true))); }
+  document.getElementById("histPageInfo").textContent=`第 ${d.page} / ${Math.max(1,Math.ceil(d.total/d.page_size))} 页`;
+  document.getElementById("histPrev").disabled = d.page<=1;
+  document.getElementById("histNext").disabled = d.page*d.page_size>=d.total;
+}
+function changeHistPage(delta){ const next=histPage+delta; if(next>=1) loadHistory(next); }
+
+/* ---------- 管理后台 ---------- */
+async function loadAdmin(){
+  await loadApiSettings();
+  const s=await api("GET","/api/admin/dashboard/stats"); if(s.status===401){clearToken();return location.reload();}
+  if(s.ok){ const d=await s.json();
+    let byModel="";
+    const keys=Object.keys(d.cost_by_model||{});
+    if(keys.length){ byModel='<div class="stat-note">按模型消耗（USD）：'+keys.map(k=>`${k}: $${d.cost_by_model[k].toFixed(4)}`).join("　")+'</div>'; }
+    document.getElementById("adminStats").innerHTML=
+    `<div class="stat"><div class="n">${d.total_users}</div><div class="l">注册员工数</div></div>
+     <div class="stat"><div class="n">${d.total_api_calls}</div><div class="l">系统总 API 调用</div></div>
+     <div class="stat"><div class="n">${d.total_images_generated}</div><div class="l">累计生成图片</div></div>
+     <div class="stat"><div class="n">$${d.total_cost_usd.toFixed(2)}</div><div class="l">累计消耗 (USD)</div></div>` + byModel; }
+  const u=await api("GET","/api/admin/users");
+  if(u.ok){ const us=await u.json(); const tb=document.querySelector("#userTable tbody"); tb.innerHTML="";
+    us.forEach(x=>{ const tr=document.createElement("tr"); tr.innerHTML=`<td>${x.username}</td><td>${x.role==="admin"?'<span class="role-badge">管理员</span>':'员工'}</td><td>${fmt(x.created_at)}</td><td>${x.total_api_calls}</td><td>${x.total_images_generated}</td><td>$${x.total_cost_usd.toFixed(4)}</td>`; tb.appendChild(tr); });
+    populateAdmImgUsers(us); }
+  loadAllTasks(1);
+  loadAdminImages(1);
+}
+function populateAdmImgUsers(us){
+  const sel=document.getElementById("admImgUser"); const prev=sel.value;
+  sel.innerHTML='<option value="">全部人员</option>';
+  (us||[]).forEach(x=>{ const o=document.createElement("option"); o.value=x.id; o.textContent=x.username; sel.appendChild(o); });
+  if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
+}
+async function loadAllTasks(page){
+  admPage=page;
+  const res=await api("GET",`/api/admin/tasks/all?page=${page}&page_size=10`);
+  if(res.status===401){ clearToken(); return location.reload(); }
+  const d=await res.json();
+  const tb=document.querySelector("#allTasksTable tbody"); tb.innerHTML="";
+  d.items.forEach(t=>{ const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${t.id.slice(0,8)}…</td><td>${t.username||'-'}</td><td>${badge(t.status)}</td><td>${t.progress_percent}%</td>
+      <td><button class="btn btn-danger btn-sm" onclick="admDelTask('${t.id}')">删除</button></td>`; tb.appendChild(tr); });
+  document.getElementById("admPageInfo").textContent=`第 ${d.page} / ${Math.max(1,Math.ceil(d.total/d.page_size))} 页`;
+  document.getElementById("admPrev").disabled=d.page<=1;
+  document.getElementById("admNext").disabled=d.page*d.page_size>=d.total;
+}
+async function admDelTask(taskId){ if(!confirm("管理员确认删除该任务及全部文件？")) return; const r=await api("DELETE",`/api/tasks/${taskId}`); if(r.ok){ showToast("已删除"); loadAllTasks(admPage); } else showToast("删除失败"); }
+function changeAdmPage(delta){ const next=admPage+delta; if(next>=1) loadAllTasks(next); }
+
+/* ---------- 全公司图片记录（逐张） ---------- */
+async function loadAdminImages(page){
+  admImgPage=page;
+  const uid=document.getElementById("admImgUser").value;
+  let url=`/api/admin/images?page=${page}&page_size=20`;
+  if(uid) url+=`&user_id=${encodeURIComponent(uid)}`;
+  const res=await api("GET",url);
+  if(res.status===401){ clearToken(); return location.reload(); }
+  if(!res.ok){ showToast("加载图片记录失败"); return; }
+  const d=await res.json();
+  const tb=document.querySelector("#adminImgTable tbody"); tb.innerHTML="";
+  d.items.forEach(it=>{
+    const orig=it.original_urls && it.original_urls.length ? it.original_urls[0] : "";
+    const origThumb = orig ? `<img class="cell-thumb" src="${orig}" onclick="openLightbox('${orig}')" alt="原图"/>` : "—";
+    const outThumb = it.output_url ? `<img class="cell-thumb" src="${it.output_url}" onclick="openLightbox('${it.output_url}')" alt="结果"/>` : (it.status==="failed"?"失败":"生成中");
+    const modeTag = it.mode==="multi_angle_fusion" ? "🅱️合成" : "🅰️单图";
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${it.owner_username}</td>
+      <td class="cell-prompt" title="${escAttr(it.prompt)}">${(it.prompt||"").slice(0,40)}${(it.prompt||"").length>40?"…":""}</td>
+      <td>${it.model||"-"}</td>
+      <td>${modeTag}</td>
+      <td>${badge(it.status)}</td>
+      <td>$${Number(it.cost_usd||0).toFixed(4)}</td>
+      <td>${fmt(it.created_at)}</td>
+      <td>${origThumb}</td>
+      <td>${outThumb}</td>`;
+    tb.appendChild(tr);
+  });
+  const pages=Math.max(1, Math.ceil(d.total/d.page_size));
+  document.getElementById("admImgPageInfo").textContent=`第 ${d.page} / ${pages} 页（共 ${d.total} 张）`;
+  document.getElementById("admImgPrev").disabled=d.page<=1;
+  document.getElementById("admImgNext").disabled=d.page*d.page_size>=d.total;
+}
+function changeAdmImgPage(delta){ const next=admImgPage+delta; if(next>=1) loadAdminImages(next); }
+
+/* 带认证的二进制下载（导出 CSV / ZIP），处理 Bearer 鉴权 */
+async function exportAdmin(format){
+  const uid=document.getElementById("admImgUser").value;
+  let url=`/api/admin/images/export?format=${format}`;
+  if(uid) url+=`&user_id=${encodeURIComponent(uid)}`;
+  const r=await api("GET",url);
+  if(r.status===401){ clearToken(); return location.reload(); }
+  if(!r.ok){ showToast("导出失败"); return; }
+  const blob=await r.blob();
+  const cd=r.headers.get("Content-Disposition")||"";
+  const m=cd.match(/filename=([^;]+)/); const fname=m? m[1] : `export.${format}`;
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+}
+function exportAdminCsv(){ exportAdmin("csv"); }
+function exportAdminZip(){ exportAdmin("zip"); }
+function escAttr(s){ return (s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ---------- API 配置 ---------- */
+async function loadApiSettings(){
+  const r=await api("GET","/api/admin/settings");
+  const hint=document.getElementById("apiKeyHint");
+  const status=document.getElementById("apiStatus"); status.textContent=""; status.className="api-status";
+  if(r.ok){ const d=await r.json();
+    document.getElementById("apiBase").value=d.gemini_base_url||"";
+    document.getElementById("apiModel").value=d.gemini_model||"";
+    document.getElementById("apiKey").value="";
+    hint.textContent = d.is_key_set ? `当前已配置 Key：${d.key_masked}（如需更换，粘贴新 Key 后保存；留空表示不修改）` : "尚未配置 Key，请粘贴后保存。";
+  } else { hint.textContent="读取配置失败。"; }
+}
+async function saveApiSettings(){
+  const key=document.getElementById("apiKey").value.trim();
+  const base=document.getElementById("apiBase").value.trim();
+  const model=document.getElementById("apiModel").value.trim();
+  const body={};
+  if(key) body.gemini_api_key=key;
+  if(base) body.gemini_base_url=base;
+  if(model) body.gemini_model=model;
+  const status=document.getElementById("apiStatus");
+  const r=await api("PUT","/api/admin/settings",{json:body});
+  if(r.ok){ const d=await r.json();
+    status.textContent="✓ 已保存，立即生效"; status.className="api-status ok";
+    document.getElementById("apiKeyHint").textContent=`当前已配置 Key：${d.key_masked}（如需更换，粘贴新 Key 后保存；留空表示不修改）`;
+    document.getElementById("apiKey").value="";
+    showToast("API 配置已保存");
+  } else { const e=await r.json().catch(()=>({})); status.textContent="✗ "+(e.detail||"保存失败"); status.className="api-status err"; }
+}
+async function testApiSettings(){
+  const status=document.getElementById("apiStatus");
+  status.textContent="测试中…"; status.className="api-status";
+  const r=await api("POST","/api/admin/settings/test");
+  if(r.ok){ const d=await r.json();
+    if(d.ok){ status.textContent=`✓ 连接成功（可用模型 ${d.model_count} 个${d.model_available?"，目标模型可用":""}）`; status.className="api-status ok"; }
+    else { status.textContent=`✗ ${d.message}（HTTP ${d.status}）`; status.className="api-status err"; }
+  } else { const e=await r.json().catch(()=>({})); status.textContent="✗ "+(e.detail||"请求失败"); status.className="api-status err"; }
+}
+
+/* ---------- 灯箱 ---------- */
+function openLightbox(src){ document.getElementById("lbImg").src=src; document.getElementById("lightbox").classList.add("show"); }
+function closeLightbox(ev){ if(ev.target.id==="lightbox"||ev.target.classList.contains("lb-close")) document.getElementById("lightbox").classList.remove("show"); }
+
+/* ---------- 工具 ---------- */
+function fmt(s){ if(!s) return ""; return new Date(s).toLocaleString("zh-CN"); }
+
+/* 轮询：控制台仅轮询「当前任务」进度，历史列表在「我的历史」页按需加载 */
+let pollTimer=null;
+function startPolling(){ if(pollTimer) clearInterval(pollTimer); pollTimer=setInterval(()=>{ if(!document.getElementById("tabConsole").classList.contains("hidden")){ pollCurrentTask(); } }, 3000); }
+
+/* 启动 */
+if(getToken()){ enterApp(); }
+else { document.getElementById("authOverlay").classList.remove("hidden"); }
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+services:
+  batch-product-studio:
+    build: .
+    image: batch-product-studio:latest
+    container_name: batch-product-studio
+    ports:
+      - "7021:7021"
+    env_file:
+      # Injects GEMINI_API_KEY, JWT_SECRET_KEY, HTTP(S)_PROXY, etc. from .env
+      - .env
+    environment:
+      # Make sure httpx (used by the Gemini client) honours proxy env vars.
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Persist generated images + originals across container restarts.
+      - ./storage:/app/storage
+      # Persist the SQLite database.
+      - ./data:/app/data
+      # Mount the frontend so UI edits on the host take effect without rebuild.
+      - ./static:/app/static
+    restart: unless-stopped
