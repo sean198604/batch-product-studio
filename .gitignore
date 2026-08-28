@@ -17,3 +17,7 @@ storage/outputs/
 
 # Local export test artifacts (contain real usage data)
 _export_test/
+
+# Local screenshot capture script (one-off dev tool, regenerates docs/screenshots/)
+docs/_shot.js
+
