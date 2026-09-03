@@ -52,7 +52,7 @@
     }
 
     /* ====================================================================
-       2. 顶栏 Top Bar（64px 固定毛玻璃栏：半透明白 + 模糊 + 顶部内高光）
+       2. 顶栏 Top Bar（64px 固定毛玻璃栏：品牌居左 · 功能菜单绝对居中 · 用户区居右）
        ==================================================================== */
     .top-bar {
       position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
@@ -61,9 +61,17 @@
       -webkit-backdrop-filter: blur(14px) saturate(160%);
       border-bottom: 1px solid rgba(255, 255, 255, 0.65);
       box-shadow: 0 6px 22px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7);
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center;
       padding: 0 32px;
       z-index: 100;
+    }
+    .top-bar > .brand { z-index: 1; }
+    .top-bar > .top-right { margin-left: auto; z-index: 1; }
+    /* 行内功能菜单：绝对居中，不参与 flex 流，登录后显隐不影响品牌/用户区对齐 */
+    #navTabs {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1;
     }
     .brand { display: flex; align-items: center; gap: 11px; }
     .brand-logo {
@@ -85,19 +93,48 @@
       padding: 2px 9px; border-radius: 999px;
       box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
     }
+    .top-user-box { display: flex; align-items: center; gap: 12px; }
+    /* GitHub Star：顶栏最右侧，其余按钮随之左移 */
+    .gh-star {
+      display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 13px;
+      border-radius: 999px; text-decoration: none;
+      background: linear-gradient(180deg, #1e293b, #0f172a); color: #fff;
+      font-size: 13px; font-weight: 700; letter-spacing: .3px;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, .28), inset 0 1px 0 rgba(255, 255, 255, .12);
+      transition: transform .22s var(--spring), box-shadow .22s var(--spring);
+    }
+    .gh-star:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(15,23,42,.34), inset 0 1px 0 rgba(255,255,255,.14); }
+    .gh-star:active { transform: translateY(0); }
 
     /* ====================================================================
-       3. 导航标签
+       3. 顶栏行内功能菜单（与品牌同行 · 白色滑动胶囊指示）
        ==================================================================== */
-    .nav { display: flex; gap: 8px; }
+    #navTabs {
+      position: relative; display: flex; align-items: center; gap: 2px;
+      padding: 5px; justify-self: center;
+    }
+    .nav-slider {
+      position: absolute; top: 5px; bottom: 5px; left: 0; width: 90px; border-radius: 11px;
+      background: rgba(255,255,255,.94);
+      border: 1px solid rgba(79,110,247,.16);
+      box-shadow: 0 3px 10px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.9);
+      opacity: 0; pointer-events: none;
+      transition: width .32s var(--spring), transform .32s var(--spring), opacity .25s;
+      will-change: transform, width;
+    }
     .nav-tab {
       appearance: none; border: 0; background: transparent; cursor: pointer;
-      font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text-muted);
-      padding: 7px 16px; border-radius: 12px;
-      transition: color .2s var(--spring), background .2s var(--spring);
+      font-family: inherit; position: relative; z-index: 1;
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      height: 34px; padding: 0 14px; border-radius: 11px;
+      color: #475569; font-size: 13px; font-weight: 600;
+      transition: color .25s var(--spring);
     }
-    .nav-tab:hover { color: var(--primary); background: rgba(79, 110, 247, 0.06); }
-    .nav-tab.active { color: var(--primary); background: rgba(79, 110, 247, 0.08); font-weight: 700; }
+    .nav-tab .nt-ico { font-size: 15px; line-height: 1; display: block; transition: transform .25s var(--spring); }
+    .nav-tab:hover { color: var(--primary); }
+    .nav-tab:hover .nt-ico { transform: translateY(-1px) scale(1.08); }
+    .nav-tab.active { color: var(--primary); font-weight: 800; }
+    .nav-tab.active .nt-ico { transform: translateY(-1px) scale(1.1); }
 
     /* ====================================================================
        4. 布局
@@ -373,6 +410,16 @@
     .modal-tabs button.active { background: linear-gradient(135deg, #4f6ef7, #6f86fa); color: #fff; border-color: transparent;
       box-shadow: 0 6px 16px rgba(79, 110, 247, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
     .modal-tip { font-size: 12.5px; color: var(--text-muted); margin: 10px 0 0; }
+    /* 「我的 API Key」弹窗底部：快速注册 Agnes 引导 */
+    .key-guide { margin-top: 14px; padding: 11px 14px; border: 1px dashed rgba(79,110,247,.5); background: rgba(79,110,247,.055); border-radius: 14px; }
+    .key-guide .kg-title { font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 5px; }
+    .key-guide .kg-steps { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--text-muted); line-height: 1.8; }
+    .key-guide .kg-steps b { color: #475569; }
+    .key-guide .kg-steps a { color: #4f6ef7; font-weight: 600; text-decoration: none; }
+    .key-guide .kg-steps a:hover { text-decoration: underline; }
+    .key-guide code { background: rgba(79,110,247,.12); padding: 0 5px; border-radius: 5px; font-family: inherit; font-size: 12px; font-weight: 700; color: #4f6ef7; }
+    .key-guide .kg-warn { margin-top: 8px; font-size: 12px; color: #b45309; background: rgba(245,158,11,.1); border-radius: 8px; padding: 6px 10px; line-height: 1.6; }
+    .key-guide .kg-warn b { font-weight: 700; }
 
     /* ====================================================================
        11. Toast / Lightbox
@@ -406,22 +453,35 @@
        ==================================================================== */
     @keyframes viewFade { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: none; } }
     .anim-view { animation: viewFade 0.4s var(--spring) both; }
+    /* 顶栏菜单：视图切换的水平滑动动画（dir 由 showTab 依据 tab 顺序决定） */
+    @keyframes viewSlideNext { from { opacity: 0; transform: translateX(46px); } to { opacity: 1; transform: none; } }
+    @keyframes viewSlidePrev { from { opacity: 0; transform: translateX(-46px); } to { opacity: 1; transform: none; } }
+    .view-slide-next { animation: viewSlideNext 0.42s var(--spring) both; }
+    .view-slide-prev { animation: viewSlidePrev 0.42s var(--spring) both; }
 
-    @media (max-width: 900px) {
-      .top-bar { padding: 0 16px; }
+    @media (max-width: 1180px) {
+      .top-bar { padding: 0 20px; }
+      .top-user { display: none; }        /* 较窄时隐藏用户名，只保留操作按钮 */
       .main-content { padding: 18px 16px 36px; }
       .stats { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 860px) {
+      .top-bar > .top-right { gap: 8px; }
     }
     @media (max-width: 768px) {
       .brand-sub { display: none; }
       .item { width: calc(50% - 4px); }
     }
-    @media (max-width: 420px) {
+    @media (max-width: 620px) {
       .item { width: 100%; }
-      .nav-tab { padding: 7px 11px; font-size: 13px; }
+      .nav-tab { padding: 0 10px; }
+      .nav-tab > span:last-child { display: none; }        /* 极窄：仅当前项保留文字 */
+      .nav-tab.active > span:last-child { display: inline; }
+      .gh-star { padding: 0 10px; }
+      .top-bar { padding: 0 10px; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .anim-view, .glass-card, .item, .btn, .nav-tab, .modal-card, .modal-overlay { animation: none; transition: none; }
+      .anim-view, .view-slide-next, .view-slide-prev, .glass-card, .item, .btn, .nav-tab, .nav-slider, .modal-card, .modal-overlay { animation: none; transition: none; }
     }
 
     .hidden { display: none !important; }
@@ -502,6 +562,7 @@
     .prompt-box { margin-top: 14px; border-top: 1px dashed rgba(15, 23, 42, 0.1); padding-top: 12px; }
     .pb-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 7px; }
     .pb-head > span:first-child { font-size: 13px; font-weight: 700; color: #334155; }
+    .prompt-box textarea { min-height: 136px; line-height: 1.55; font-size: 13.5px; }
     .pb-note { font-size: 11.5px; line-height: 1.5; color: var(--text-muted); }
 
     /* 设置区 */
@@ -589,7 +650,17 @@
         <span class="brand-sub">SCENE IMAGE STUDIO</span>
       </div>
     </div>
-    <div class="top-right" id="userBox"></div>
+    <!-- 顶栏行内功能菜单（登录后显示，与品牌同一行、固定页面顶部） -->
+    <div id="navTabs" class="hidden">
+      <div class="nav-slider" id="navSlider"></div>
+      <button id="navConsole" class="nav-tab active" onclick="showTab('console')"><span class="nt-ico">🖼️</span><span>生成控制台</span></button>
+      <button id="navHistory" class="nav-tab" onclick="showTab('history')"><span class="nt-ico">🕘</span><span>我的历史</span></button>
+      <button id="navAdmin" class="nav-tab hidden" onclick="showTab('admin')"><span class="nt-ico">⚙️</span><span>管理后台</span></button>
+    </div>
+    <div class="top-right">
+      <div id="userBox" class="top-user-box"></div>
+      <a class="gh-star" href="https://github.com/sean198604/batch-product-studio" target="_blank" rel="noopener" title="喜欢这个工具？去 GitHub 点个 Star ⭐">⭐ Star</a>
+    </div>
   </header>
 
   <div class="page-layout">
@@ -636,17 +707,22 @@
             <span class="api-status" id="myKeyStatus"></span>
           </div>
           <p class="modal-tip" style="margin-top:12px;">说明：① Key 只用于后台调用生成，界面一律掩码显示，管理员可见归属但与你的账号密码无关；② 未绑定时每天免费生成 <b id="keyLimitTip">20</b> 张；③ 绑定后想换 Key 直接粘贴新的再「验证并保存」即可覆盖。</p>
+          <!-- 底部：快速注册 Agnes 引导 -->
+          <div class="key-guide">
+            <div class="kg-title">还没有 Agnes Key？1 分钟免费注册 ↓</div>
+            <ol class="kg-steps">
+              <li>打开注册页 <a href="https://platform.agnes-ai.cn" target="_blank" rel="noopener">platform.agnes-ai.cn ↗</a>（国内节点，邮箱注册即可，无需实名 / 绑卡）</li>
+              <li>查收邮箱验证码并设置密码 → 登录 Agnes 开发者控制台</li>
+              <li>左侧菜单点 <b>设置</b> → <b>API 密钥</b> → <b>创建新密钥</b>，命名后确认生成</li>
+              <li>复制生成的 <code>sk-…</code> 开头 Key，粘贴到上方输入框，点「验证并保存」即解锁不限量</li>
+            </ol>
+            <div class="kg-warn">⚠️ 密钥<b>仅展示一次</b>：关闭弹窗 / 页面后无法再次查看完整密钥，请立即复制并妥善保存，切勿截图公开。</div>
+          </div>
         </div>
       </div>
 
       <!-- ===== 应用区 ===== -->
       <div id="appArea" class="hidden">
-        <div class="nav" id="navTabs">
-          <button id="navConsole" class="nav-tab active" onclick="showTab('console')">生成控制台</button>
-          <button id="navHistory" class="nav-tab" onclick="showTab('history')">我的历史</button>
-          <button id="navAdmin" class="nav-tab hidden" onclick="showTab('admin')">管理后台</button>
-        </div>
-
         <!-- 控制台 -->
         <div id="tabConsole" class="anim-view">
           <div class="view-head">
@@ -677,7 +753,7 @@
                     <span>场景描述（自动填入，可微调）</span>
                     <span class="pb-note">提交后后端自动叠加：主体保真锁 · 物理防畸变 · 商业级画质；选「节日季节」时额外注入居中构图锁</span>
                   </div>
-                  <textarea id="prompt" rows="3" placeholder="先从上方选一个场景，或在此直接描述你想要的环境。" oninput="markPromptDirty()"></textarea>
+                  <textarea id="prompt" rows="5" placeholder="先从上方选一个场景，或在此直接描述你想要的环境。" oninput="markPromptDirty()"></textarea>
                 </div>
               </section>
 
@@ -991,6 +1067,7 @@ async function enterApp(){
   try { await fetchMe(); } catch(e){ location.reload(); return; }
   document.getElementById("userBox").innerHTML =
     `<span class="top-user">${meUser.username}</span> ${meUser.role==="admin"?'<span class="role-badge">管理员</span>':''} <button class="btn btn-ghost btn-sm" onclick="openKeyModal()">🔑 API Key</button> <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>`;
+  document.getElementById("navTabs").classList.remove("hidden");
   document.getElementById("navAdmin").classList.toggle("hidden", meUser.role!=="admin");
   loadConfig();
   showTab("console");
@@ -1000,16 +1077,41 @@ async function enterApp(){
 
 function logout(){ clearToken(); location.reload(); }
 
+let _curTab = "";
+function moveNavPill(){
+  const bar = document.getElementById("navTabs");
+  const pill = document.getElementById("navSlider");
+  const act = bar ? bar.querySelector(".nav-tab.active") : null;
+  if(!bar || !pill || !act) return;
+  const br = bar.getBoundingClientRect(), ar = act.getBoundingClientRect();
+  pill.style.width = ar.width + "px";
+  pill.style.transform = "translateX(" + (ar.left - br.left) + "px)";
+  pill.style.opacity = "1";
+}
 function showTab(name){
-  ["console","history","admin"].forEach(t=>{
-    document.getElementById("tab"+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle("hidden", t!==name);
-    document.getElementById("nav"+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle("active", t===name);
+  const tabs = ["console","history","admin"];
+  const dir = _curTab ? (tabs.indexOf(name) > tabs.indexOf(_curTab) ? 1 : -1) : 1;
+  tabs.forEach(t=>{
+    const tc = "tab" + t.charAt(0).toUpperCase() + t.slice(1);
+    const nc = "nav" + t.charAt(0).toUpperCase() + t.slice(1);
+    const el = document.getElementById(tc); if(el) el.classList.toggle("hidden", t!==name);
+    const nb = document.getElementById(nc); if(nb) nb.classList.toggle("active", t===name);
   });
-  const view=document.getElementById("tab"+name.charAt(0).toUpperCase()+name.slice(1));
-  view.classList.remove("anim-view"); void view.offsetWidth; view.classList.add("anim-view");
+  const view = document.getElementById("tab" + name.charAt(0).toUpperCase() + name.slice(1));
+  if(view){
+    view.classList.remove("anim-view","view-slide-next","view-slide-prev");
+    void view.offsetWidth;
+    view.classList.add(dir > 0 ? "view-slide-next" : "view-slide-prev");
+  }
+  moveNavPill();
   if(name==="history") loadHistory(1);
   if(name==="admin") loadAdmin();
+  _curTab = name;
 }
+window.addEventListener("resize", ()=>{
+  const aa = document.getElementById("appArea");
+  if(aa && !aa.classList.contains("hidden")) moveNavPill();
+});
 
 /* ---------- 控制台 ---------- */
 function onFiles(input){
@@ -1874,7 +1976,7 @@ async function saveMyKey(){
   if(!key) return keyStatusMsg("请先粘贴 Agnes API Key", false);
   const btn = document.getElementById("myKeyBtn");
   if(btn) btn.disabled = true;
-  keyStatusMsg("验证中…（会产生一次 1×1 极小型免费测试图）", true);
+  keyStatusMsg("验证中…（会产生一次极小型免费测试图）", true);
   try{
     const r = await api("PUT", "/api/profile/agnes-key", { json: { api_key: key } });
     if(r.status === 401){ clearToken(); return location.reload(); }
