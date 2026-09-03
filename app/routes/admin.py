@@ -17,15 +17,22 @@ from app.config import settings
 from app.db import get_session
 from app.deps import get_current_user, require_admin
 from app.gemini import test_connection
+from app.agnes import test_connection_agnes, probe_agnes_key
+from app import pool as keypool
+from app import settings_store
 from app.models import (
     AdminImageRecord,
     AdminSettings,
     AdminSettingsUpdate,
     AdminStats,
+    ApiKey,
     ApiTestResult,
     GenerationTask,
     PagedImageRecords,
     PagedTasks,
+    PoolKeyAddBody,
+    PoolKeyOut,
+    PoolTestResult,
     TaskSummary,
     TaskItem,
     User,
@@ -65,17 +72,154 @@ async def put_settings(
     _admin: User = Depends(require_admin),
 ) -> AdminSettings:
     """Persist admin-edited overrides. Empty fields are left unchanged."""
-    return AdminSettings(**update_settings(
+    pub = update_settings(
         api_key=body.gemini_api_key,
         gemini_base_url=body.gemini_base_url,
         gemini_model=body.gemini_model,
-    ))
+        enable_gemini=body.enable_gemini,
+        agnes_api_key=body.agnes_api_key,
+        agnes_base_url=body.agnes_base_url,
+        agnes_size_tier=body.agnes_size_tier,
+        agnes_user_tier=body.agnes_user_tier,
+    )
+    # 配置（agnes_api_key / agnes_extra_keys）变化后同步进 Key 池。
+    await keypool.sync_system_keys_from_settings()
+    return AdminSettings(**pub)
 
 
 @router.post("/settings/test", response_model=ApiTestResult)
 async def test_settings(_admin: User = Depends(require_admin)) -> ApiTestResult:
     """Ping the Gemini endpoint with the current key (quota-free model list)."""
     return ApiTestResult(**await test_connection())
+
+
+@router.post("/settings/test-agnes", response_model=ApiTestResult)
+async def test_settings_agnes(_admin: User = Depends(require_admin)) -> ApiTestResult:
+    """Validate the Agnes key with a tiny, free generation (no file saved)."""
+    return ApiTestResult(**await test_connection_agnes())
+
+
+# --------------------------------------------------------------------------- #
+# Agnes Key 池（管理员）
+# --------------------------------------------------------------------------- #
+async def _pool_key_out(row: ApiKey, username: str | None) -> PoolKeyOut:
+    return PoolKeyOut(
+        id=row.id,
+        provider=row.provider,
+        owner_username=username,
+        source=row.source,
+        masked=settings_store.mask_key(row.key_value),
+        status=row.status,
+        note=row.note,
+        created_at=row.created_at,
+        validated_at=row.validated_at,
+        last_used_at=row.last_used_at,
+    )
+
+
+@router.get("/keys", response_model=list[PoolKeyOut])
+async def list_pool_keys(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[PoolKeyOut]:
+    """Full key pool with owner username (system keys show owner NULL)."""
+    rows = (
+        await session.execute(
+            select(ApiKey, User.username)
+            .outerjoin(User, ApiKey.owner_user_id == User.id)
+            .where(ApiKey.provider == "agnes")
+            .order_by(ApiKey.source, ApiKey.id.desc())
+        )
+    ).all()
+    return [await _pool_key_out(row, username) for row, username in rows]
+
+
+@router.post("/keys", response_model=PoolKeyOut, status_code=201)
+async def add_system_key(
+    body: PoolKeyAddBody,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> PoolKeyOut:
+    """Add an admin/system key to the pool (no live probe at insert time;
+    use POST /keys/{id}/test afterwards to verify it)."""
+    raw = (body.api_key or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="请粘贴 Agnes API Key。")
+    dup = (
+        await session.execute(
+            select(ApiKey).where(
+                ApiKey.provider == "agnes", ApiKey.key_value == raw
+            )
+        )
+    ).scalars().first()
+    if dup is not None:
+        owner = None
+        if dup.owner_user_id:
+            u = await session.get(User, dup.owner_user_id)
+            owner = u.username if u else str(dup.owner_user_id)
+        raise HTTPException(
+            status_code=409,
+            detail="该 Key 已在池中（"
+            + (owner or "系统")
+            + " 添加），无需重复录入。",
+        )
+    row = ApiKey(
+        provider="agnes",
+        source="system",
+        owner_user_id=None,
+        key_value=raw,
+        status="valid",
+        note=(body.note or "").strip() or "后台添加",
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return await _pool_key_out(row, None)
+
+
+@router.post("/keys/{key_id}/test", response_model=PoolTestResult)
+async def test_pool_key(
+    key_id: int,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> PoolTestResult:
+    """Live-probe one stored pool key and update its status."""
+    row = await session.get(ApiKey, key_id)
+    if row is None or row.provider != "agnes":
+        raise HTTPException(status_code=404, detail="Key 不存在。")
+    probe = await probe_agnes_key(api_key=row.key_value)
+    ok = bool(probe.get("ok"))
+    auth_failed = bool(probe.get("auth_failed"))
+    if ok:
+        row.status = "valid"
+        row.note = (row.note or "").replace("；", "").strip()
+        row.validated_at = keypool._utcnow()
+    elif auth_failed:
+        row.status = "invalid"
+        row.note = f"校验被服务端拒绝：{str(probe.get('message',''))[:200]}"
+    # 429 / 网络抖动：不轻易改状态，仅刷新校验时间戳方便排查。
+    await session.commit()
+    return PoolTestResult(
+        ok=ok,
+        status=int(probe.get("status") or 0),
+        message=str(probe.get("message", "")),
+        auth_failed=auth_failed,
+    )
+
+
+@router.delete("/keys/{key_id}")
+async def delete_pool_key(
+    key_id: int,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Revoke any pool key (system or a user's bound key)."""
+    row = await session.get(ApiKey, key_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Key 不存在。")
+    await session.delete(row)
+    await session.commit()
+    return {"ok": True, "deleted_key_id": row.id}
 
 
 @router.get("/dashboard/stats", response_model=AdminStats)

@@ -26,8 +26,28 @@ class Settings(BaseSettings):
 
     # ---------- Google AI Studio ----------
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash-image"
+    # 系统默认生图模型：Agnes Image 2.5 Flash（图生图，国内节点，当前官方免费 $0）。
+    # Agnes 免费且质量优于 2.1，故作为开箱默认；管理员可在后台改回任意 Gemini 模型。
+    # RPM 由 app/agnes.py 的令牌桶按「账户档位 × 分辨率档位」精确封顶，不会超限。
+    gemini_model: str = "agnes-image-2.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    # ---------- Agnes AI (图生图，国内 .cn 节点，当前免费) ----------
+    # 国际节点 apihub.agnes-ai.com 在国内常不可达，默认用 .cn 镜像（模型名/
+    # 参数/Key 完全一致）。size 决定 RPM 上限与出图分辨率（详见 agnes.py 的
+    # RPM_MATRIX：default 1K=20、2K=10、3K/4K=1 稳态 RPM 等）。
+    agnes_api_key: str = ""
+    agnes_base_url: str = "https://apihub.agnes-ai.cn/v1"
+    agnes_size_tier: str = "1K"        # 1K / 2K / 3K / 4K（分辨率档）
+    agnes_user_tier: str = "default"   # default / enterprise / tokenplan（账户档）
+
+    # ---------- 模型开放 / 免费额度 ----------
+    # Gemini 模型默认隐藏：仅当管理员在后台开启 enable_gemini 后，员工才
+    # 能看见并使用 Gemini 模型（/api/config 过滤 + 建任务时后端二次拦截）。
+    enable_gemini: bool = False
+    # 未绑定有效 Agnes API Key 的员工，每天最多免费生成图片的张数；
+    # 绑定过有效 Key（或管理员）的用户不限量。
+    free_daily_limit: int = 20
 
     # ---------- Rate limiting (anti 429) ----------
     request_interval_seconds: float = 3.5   # forced sleep after each success

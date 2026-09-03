@@ -11,15 +11,16 @@ from __future__ import annotations
 import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app import worker
+from app import pool as keypool
 from app.config import settings
 from app.db import init_db
-from app.routes import admin, auth, tasks
+from app.routes import admin, auth, profile, tasks
 from app import settings_store
 
 logging.basicConfig(
@@ -43,6 +44,8 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.outputs_dir, exist_ok=True)
     os.makedirs(settings.data_dir, exist_ok=True)
     await init_db()
+    # 把 data/settings.json 里的系统 Agnes Key（默认 Key + 追加 Key）同步进池。
+    await keypool.sync_system_keys_from_settings()
     await worker.start_worker()
     logger.info("Application started.")
     yield
@@ -59,6 +62,7 @@ app = FastAPI(
 )
 
 app.include_router(auth.router)
+app.include_router(profile.router)
 app.include_router(tasks.router)
 app.include_router(admin.router)
 
@@ -84,14 +88,58 @@ async def public_config() -> dict:
 
     Lets the console pre-select the admin-configured default model and build
     the model dropdown with live unit prices, without exposing any secret.
-    Staff cannot read the API key via this endpoint.
+    Staff cannot read the API key via this endpoint. Gemini models are hidden
+    unless the admin enables them (``enable_gemini``).
     """
-    from app import pricing
+    from app import pricing, presets, scenes
+
+    catalog = pricing.catalog()
+    enable_gemini = settings_store.get_enable_gemini()
+    if not enable_gemini:
+        catalog = [m for m in catalog if m.get("provider") != "gemini"]
+
+    model = settings_store.get_model()
+    if not enable_gemini and any(
+        m.get("provider") == "gemini" and m.get("id") == model for m in pricing.catalog()
+    ):
+        # 管理员配置的默认模型是 Gemini 但开关已关闭 → 退回首个可用模型。
+        model = next((m["id"] for m in catalog), "")
 
     return {
-        "gemini_model": settings_store.get_model(),
-        "models": pricing.catalog(),
+        # 控制台默认选中的模型（后台可改；默认 Agnes Image 2.5 Flash，免费）
+        "default_model": model,
+        "gemini_model": model,  # 兼容旧前端字段名，等价于 default_model
+        "models": catalog,
+        # Gemini 模型全局开关（默认关闭=员工不可见不可用）
+        "enable_gemini": enable_gemini,
+        # 统一场景库：分类 Tab + 全部可选场景 + 微调修饰器 + 输出比例
+        # （前端不再硬编码任何提示词，改场景只需改 app/presets.py 并重建）
+        **presets.payload(),
+        # Agnes 档位（非敏感）：供控制台预估批量耗时（RPM 由后端令牌桶精确封顶）
+        "agnes_user_tier": settings_store.get_agnes_user_tier(),
+        "agnes_size_tier": settings_store.get_agnes_size_tier(),
+        # 免费额度与 Key 池概况（非敏感）：未绑定 Key 的员工每天免费 N 张
+        "free_daily_limit": settings_store.get_free_daily_limit(),
+        "agnes_pool": await keypool.pool_summary(),
+        # 节日/季节主题目录（供管理后台与调试查看），前端主入口已改用 scenes 列表
+        "themes": scenes.theme_catalog(),
     }
+
+
+@app.get("/api/scenes/preview", tags=["meta"])
+async def scene_preview(theme: str = Query(..., description="ghost|spring|autumn")) -> dict:
+    """Return one sample themed prompt for the given theme.
+
+    Used by the console's "random variant" chip so the staff can see what a
+    generated combination looks like before submitting. Non-sensitive: it only
+    exposes prompt text, never any credential.
+    """
+    from app import scenes
+
+    if not scenes.is_valid_theme(theme):
+        raise HTTPException(status_code=400, detail="未知主题。")
+    text, meta = scenes.render_theme_prompt(theme)
+    return {"prompt": text, **meta}
 
 
 if __name__ == "__main__":

@@ -38,6 +38,7 @@ class ModelPrice:
     tag: str = ""                # 业务定位（emoji + 短标题），用于前端展示
     description: str = ""        # 适用场景与推荐使用时机
     note: str = ""
+    provider: str = "gemini"     # gemini | agnes，前端据此分组 / 走不同客户端
 
     @property
     def unit_price_usd(self) -> float | None:
@@ -94,6 +95,42 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         description="电商大促主图、宣传海报渲染，画质与物理光影质感最顶，生成耗时相对较长。",
         note="已弃用，官方定价页已无此模型，按 $0 计（不计费）。",
     ),
+    # ---- Agnes AI 图生图（国内 .cn 节点，当前官方免费 $0）----
+    # 与 Gemini 同为图生图：1 输入图 + 1 输出图。免费，故单价记为 None。
+    # 官方文档：https://agnes-ai.com/zh-Hans/docs/agnes-image-20-flash 等。
+    "agnes-image-2.0-flash": ModelPrice(
+        id="agnes-image-2.0-flash",
+        label="Agnes Image 2.0 Flash（图生图 · 国内节点 · 免费）",
+        input_per_1m=0.0,
+        output_per_1m=0.0,
+        output_tokens_1k=0,
+        provider="agnes",
+        tag="🆓 Agnes 图生图（编辑保真强）",
+        description="Agnes AI 图生图（agnes-image-2.0-flash），经国内 .cn 节点调用，当前免费。AA 图像编辑榜 ELO 1184（Top 20），擅长局部修图 / 换背景 / 原图微调，最大限度保留原图结构与构图，适合高保真产品图转场景。",
+        note="官方当前免费（$0），本次生成不计费；RPM 按分辨率档：1K≈20 / 2K≈10 / 3K·4K≈1。",
+    ),
+    "agnes-image-2.1-flash": ModelPrice(
+        id="agnes-image-2.1-flash",
+        label="Agnes Image 2.1 Flash（图生图 · 国内节点 · 免费）",
+        input_per_1m=0.0,
+        output_per_1m=0.0,
+        output_tokens_1k=0,
+        provider="agnes",
+        tag="🆓 Agnes 免费图生图",
+        description="Agnes AI 图生图（agnes-image-2.1-flash），经国内 .cn 节点调用，当前免费。适合白底产品图转场景图、多角度融合，速度与 Gemini 2.5 Flash 相当。",
+        note="官方当前免费（$0），本次生成不计费；RPM 按分辨率档：1K≈20 / 2K≈10 / 3K·4K≈1。",
+    ),
+    "agnes-image-2.5-flash": ModelPrice(
+        id="agnes-image-2.5-flash",
+        label="Agnes Image 2.5 Flash（图生图 · 国内节点 · 免费 · 更高质）",
+        input_per_1m=0.0,
+        output_per_1m=0.0,
+        output_tokens_1k=0,
+        provider="agnes",
+        tag="🆓 Agnes 高质图生图",
+        description="Agnes AI 图生图旗舰（agnes-image-2.5-flash），质量优于 2.1，经国内 .cn 节点调用，当前免费。推荐用于结构复杂、含微小文字/Logo 的高质量场景渲染。",
+        note="官方当前免费（$0），本次生成不计费；RPM 按分辨率档：1K≈20 / 2K≈10 / 3K·4K≈1。",
+    ),
 }
 
 
@@ -124,6 +161,7 @@ def catalog() -> list[dict]:
                 "label": p.label,
                 "tag": p.tag,
                 "description": p.description,
+                "provider": p.provider,
                 "unit_price_usd": p.unit_price_usd,
                 "unit_price_cny": p.unit_price_cny,
                 "note": p.note,

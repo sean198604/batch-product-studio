@@ -23,6 +23,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import tempfile
 from typing import List, Optional
 
@@ -30,9 +31,13 @@ from sqlalchemy import select
 
 from app import models
 from app.config import settings
+from app import settings_store
+from app import pool as keypool
 from app.db import async_session_maker
 from app.gemini import GeminiClient, mime_to_ext
+from app.agnes import AgnesClient, looks_like_auth_error
 from app.prompts import assemble_prompt
+from app.scenes import render_theme_prompt
 from app import pricing
 
 logger = logging.getLogger("worker")
@@ -41,6 +46,7 @@ logger = logging.getLogger("worker")
 _queue: Optional[asyncio.Queue] = None
 _semaphore: Optional[asyncio.Semaphore] = None
 _client: Optional[GeminiClient] = None
+_agnes_client: Optional[AgnesClient] = None
 _task: Optional[asyncio.Task] = None
 
 # FIFO order of task_ids that still have pending items.
@@ -81,11 +87,47 @@ def _prepare_api_image(original_path: str) -> str:
         ) from exc
 
 
+def _build_prompt(task, multi: bool) -> str:
+    """Resolve the prompt to send for one item, honouring the theme mode.
+
+    Three cases:
+    * no theme            -> reuse ``task.full_prompt`` (assembled at creation).
+    * theme, not random   -> reuse ``task.full_prompt`` too: the staff picked a
+                             curated chip, so what they saw in the box (plus the
+                             injected centering / atmosphere layers) is what we
+                             send. Keeps the console WYSIWYG.
+    * theme + random      -> compose a FRESH combination per item from the theme
+                             vocabulary with a random seed, so a batch of N
+                             products yields N distinct on-theme scenes. The
+                             staff's own text (if any) is preserved as an extra
+                             requirement rather than overwritten.
+    """
+    theme = (getattr(task, "theme", None) or "").strip() or None
+    if not theme:
+        return task.full_prompt or assemble_prompt(task.prompt, multi_angle=multi)
+
+    if not getattr(task, "theme_random", False):
+        return task.full_prompt or assemble_prompt(
+            task.prompt, multi_angle=multi, theme=theme
+        )
+
+    theme_text, meta = render_theme_prompt(theme, seed=random.randint(100000, 999999))
+    extra = (task.prompt or "").strip()
+    body = f"{theme_text} Additional requirements: {extra}" if extra else theme_text
+    logger.info(
+        "theme variant: %s seed=%s bg=%s el=%s light=%s",
+        meta["theme"], meta["seed"], meta["background"],
+        meta["element"], meta["light"],
+    )
+    return assemble_prompt(body, multi_angle=multi, theme=theme)
+
+
 async def start_worker() -> None:
-    global _queue, _semaphore, _client, _task
+    global _queue, _semaphore, _client, _agnes_client, _task
     _queue = asyncio.Queue()
     _semaphore = asyncio.Semaphore(settings.semaphore_concurrency)
     _client = GeminiClient()
+    _agnes_client = AgnesClient()
     await recover_pending()
     _task = asyncio.create_task(_run(), name="gemini-worker")
     logger.info("Background worker started (concurrency=%d, interval=%.1fs).",
@@ -185,8 +227,24 @@ async def _process(item_id: str) -> None:
         task.status = "processing"
         _current_task = task.id
 
+        # Agnes 池中实际扣减的 Key（成功则记 last_used_at；401/403 则标失效）
+        used_key = None
+
         try:
             async with _semaphore:
+                # ---- 每日免费额度闸门（未绑定有效 Agnes Key 的员工适用）----
+                # 管理员与已绑定有效 Key 的用户不限量；其余用户每天最多
+                # free_daily_limit 张（北京日历日）。这里的判定是权威的：
+                # 创建任务时的预检只是提前拦截，此处保证队列堆积也不超限。
+                if user is not None and not await keypool.has_unlimited(session, user):
+                    limit = settings_store.get_free_daily_limit()
+                    if await keypool.used_today(session, user.id) >= limit:
+                        raise RuntimeError(
+                            f"今日免费额度（{limit} 张/天）已用完。"
+                            "请在右上角「🔑 API Key」绑定自己的 Agnes Key 解锁不限量，"
+                            "或明日 0 点后再试。"
+                        )
+
                 # The backend "物理真实感与防畸变拼装引擎" wraps the user prompt
                 # into a strict 4-layer structure (保真锁 + 防畸变 + 用户场景 +
                 # 商业画质) at task creation time; the result is stored in
@@ -195,7 +253,44 @@ async def _process(item_id: str) -> None:
                 # re-encoded to a clean PNG first so a malformed / oddly-encoded
                 # source can't trigger Google's "Unable to process input image".
                 multi = (task.mode == "multi_angle_fusion")
-                if multi:
+                use_agnes = bool(task.model) and task.model.startswith("agnes-")
+                if use_agnes:
+                    # Agnes 图生图：单图与多角度合成都合并进 extra_body.image。
+                    # 解析本次生成使用的池 Key：自有（不限量）-> 系统 Key -> 池内轮换。
+                    uid = user.id if user is not None else 0
+                    used_key = await keypool.pick_pool_key(session, uid)
+                    agnes_api_key = (
+                        used_key.key_value
+                        if used_key is not None
+                        else settings_store.get_agnes_key()
+                    )
+                    if multi:
+                        src_paths = (
+                            json.loads(item.original_paths)
+                            if item.original_paths
+                            else [item.original_path]
+                        )
+                    else:
+                        src_paths = [item.original_path]
+                    api_images = [_prepare_api_image(_abs(p)) for p in src_paths]
+                    prompt_to_send = _build_prompt(task, multi)
+                    try:
+                        image_bytes, mime = await _agnes_client.generate(
+                            prompt_to_send,
+                            api_images,
+                            model=task.model,
+                            size=settings_store.get_agnes_size_tier(),
+                            ratio=task.ratio or "",
+                            api_key=agnes_api_key,
+                        )
+                    finally:
+                        for ai in api_images:
+                            if ai != _abs(item.original_path) and os.path.exists(ai):
+                                try:
+                                    os.remove(ai)
+                                except OSError:
+                                    pass
+                elif multi:
                     # 多角度合成：把多张参考图作为多个 inline_data 一次性提交，
                     # 由模型融合成单张场景图。
                     import json as _json  # noqa: F401
@@ -205,9 +300,7 @@ async def _process(item_id: str) -> None:
                         else [item.original_path]
                     )
                     api_images = [_prepare_api_image(_abs(p)) for p in src_paths]
-                    prompt_to_send = task.full_prompt or assemble_prompt(
-                        task.prompt, multi_angle=True
-                    )
+                    prompt_to_send = _build_prompt(task, multi)
                     try:
                         image_bytes, mime = await _client.generate_image_multi(
                             prompt_to_send, api_images, model=task.model
@@ -221,7 +314,7 @@ async def _process(item_id: str) -> None:
                                     pass
                 else:
                     api_image = _prepare_api_image(_abs(item.original_path))
-                    prompt_to_send = task.full_prompt or assemble_prompt(task.prompt)
+                    prompt_to_send = _build_prompt(task, multi)
                     try:
                         image_bytes, mime = await _client.generate_image(
                             prompt_to_send, api_image, model=task.model
@@ -251,6 +344,8 @@ async def _process(item_id: str) -> None:
                 user.total_api_calls += 1          # atomic within this commit
                 user.total_images_generated += 1
                 user.total_cost_usd = (user.total_cost_usd or 0.0) + cost
+            if used_key is not None:
+                await keypool.mark_key_used(session, used_key)
 
             # ---- global pacing: enforce safe interval AFTER a success ----
             await session.commit()
@@ -260,6 +355,11 @@ async def _process(item_id: str) -> None:
             item.status = "failed"
             item.error_message = str(exc)
             task.failed_count += 1
+            # 服务端明确拒绝该 Key（401/403）→ 自动移出可用池，避免反复打到坏 Key。
+            if used_key is not None and looks_like_auth_error(str(exc)):
+                await keypool.mark_key_invalid(
+                    session, used_key, f"生图被服务端拒绝，已自动失效：{str(exc)[:200]}"
+                )
             await session.commit()
             logger.error("Item %s failed: %s", item_id, exc)
         finally:

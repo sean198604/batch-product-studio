@@ -24,13 +24,22 @@ generated scenes believable:
       White-bg mode: high-contrast studio lighting, razor-sharp clean edges,
       pristine e-commerce catalog standard.
 
-``assemble_prompt`` composes those four layers. The frontend writes the user's
+When a festival / seasonal ``theme`` is selected (ghost / spring / autumn), an
+extra **composition layer** is injected between Layer 2 and Layer 3: the shared
+``CENTER_COMPOSITION`` lock (product dead-center, never cropped or occluded)
+plus the theme's own atmosphere / taboo accent. This is what keeps seasonal
+scenes both "居中" and "主题鲜明" while the existing physics engine stays intact.
+
+``assemble_prompt`` composes those layers. The frontend writes the user's
 scene text (preset + manual + ratio + modifier tags) into the visible box, so
-what the staff sees is exactly Layer 3; Layers 1 / 2 / 4 are injected here. The
-mode (normal vs white-bg) is selected by an explicit ``white_bg`` flag or,
-failing that, by detecting A-group "pure white background" phrases in Layer 3.
+what the staff sees is exactly Layer 3; Layers 1 / 2 / 4 and the theme layer
+are injected here. The mode (normal vs white-bg) is selected by an explicit
+``white_bg`` flag or, failing that, by detecting A-group "pure white
+background" phrases in Layer 3.
 """
 from __future__ import annotations
+
+from app.scenes import theme_layer
 
 # --- Layer 1：主体保真与形状锁定（强制保留原产品，绝不形变）---
 FIDELITY_LOCK: str = (
@@ -101,7 +110,10 @@ def is_white_bg_prompt(user_prompt: str) -> bool:
 
 
 def assemble_prompt(
-    user_prompt: str, white_bg: bool | None = None, multi_angle: bool = False
+    user_prompt: str,
+    white_bg: bool | None = None,
+    multi_angle: bool = False,
+    theme: str | None = None,
 ) -> str:
     """Wrap a user scene description into the strict 4-layer prompt.
 
@@ -125,6 +137,11 @@ def assemble_prompt(
     environment / ratio / modifier phrases the frontend wrote into the box). An
     empty / whitespace-only user prompt still gets Layers 1 / 2 / 4 so
     generation is never left unconstrained.
+
+    ``theme`` (ghost / spring / autumn) additionally injects the composition
+    layer -- see ``app.scenes.theme_layer`` -- right after Layer 2, so the
+    centering lock and the theme atmosphere are enforced as hard constraints
+    rather than depending on what the staff typed.
     """
     if white_bg is None:
         white_bg = is_white_bg_prompt(user_prompt)
@@ -134,6 +151,10 @@ def assemble_prompt(
     layer2 = PHYSICS_LOCK_WHITE if white_bg else PHYSICS_LOCK
     layer4 = QUALITY_RENDER_WHITE if white_bg else QUALITY_RENDER
     parts = [layer1, layer2]
+    # 主题构图层（居中锁 + 节日/季节氛围约束），仅在选定主题时注入
+    tl = theme_layer(theme)
+    if tl:
+        parts.append(tl)
     if user_prompt:
         parts.append(user_prompt)
     parts.append(layer4)

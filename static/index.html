@@ -426,6 +426,151 @@
 
     .hidden { display: none !important; }
 
+    /* ====================================================================
+       13. 控制台重构：两栏（主流程 + 常驻设置侧栏）
+       ==================================================================== */
+    .console-grid { display: grid; grid-template-columns: minmax(0, 1fr) 344px; gap: 16px; align-items: start; }
+    @media (max-width: 1080px){ .console-grid { grid-template-columns: 1fr; } }
+    .console-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .console-side { min-width: 0; }
+    .sticky-side { position: sticky; top: calc(var(--header-h) + 18px); }
+    @media (max-width: 1080px){ .sticky-side { position: static; } }
+
+    /* 步骤头 */
+    .step-head { display: flex; gap: 11px; align-items: flex-start; margin-bottom: 12px; }
+    .step-no {
+      width: 24px; height: 24px; flex: none; border-radius: 8px; font-size: 13px; font-weight: 800;
+      color: #fff; background: linear-gradient(135deg, #4f6ef7, #6f86fa);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 10px rgba(79, 110, 247, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+    .step-head .card-title { margin-bottom: 2px; }
+
+    /* 场景库 工具栏 */
+    .scene-toolbar { display: flex; flex-direction: column; gap: 9px; }
+    .glass-input {
+      width: 100%; padding: 10px 14px; border-radius: 12px; font-size: 14px; color: #0f172a;
+      font-family: inherit; border: 1px solid rgba(226, 232, 240, 0.8);
+      background: rgba(255, 255, 255, 0.62);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      transition: border-color 0.2s var(--spring), box-shadow 0.2s var(--spring), background 0.2s;
+    }
+    .glass-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 110, 247, 0.14); background: rgba(255, 255, 255, 0.9); }
+
+    /* 场景卡片网格 */
+    .scene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); gap: 10px; margin-top: 12px; }
+    .scene-card {
+      position: relative; text-align: left; cursor: pointer; padding: 12px 12px 11px;
+      border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      font-family: inherit; color: var(--text-main);
+      transition: transform 0.22s var(--spring), box-shadow 0.22s var(--spring), border-color 0.22s, background 0.22s;
+    }
+    .scene-card:hover { transform: translateY(-2px); border-color: rgba(79, 110, 247, 0.4); background: rgba(255, 255, 255, 0.72); }
+    .scene-card:active { transform: translateY(0) scale(0.985); }
+    .scene-card.active {
+      background: linear-gradient(135deg, #4f6ef7, #6f86fa); border-color: transparent; color: #fff;
+      box-shadow: 0 10px 24px rgba(79, 110, 247, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .sc-emoji { font-size: 24px; line-height: 1; }
+    .sc-name { font-size: 13.5px; font-weight: 700; margin-top: 7px; letter-spacing: 0.2px; }
+    .sc-sum {
+      font-size: 11.5px; line-height: 1.45; margin-top: 3px; color: var(--text-muted);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .scene-card.active .sc-sum { color: rgba(255, 255, 255, 0.88); }
+    .sc-check {
+      position: absolute; top: 9px; right: 9px; width: 19px; height: 19px; border-radius: 50%;
+      background: #fff; color: #4f6ef7; font-size: 12px; font-weight: 800; line-height: 1;
+      display: none; align-items: center; justify-content: center;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+    }
+    .scene-card.active .sc-check { display: flex; }
+    .sc-tag {
+      position: absolute; top: 9px; right: 9px; font-size: 10px; font-weight: 700;
+      padding: 1px 7px; border-radius: 999px; background: rgba(79, 110, 247, 0.12); color: #4f6ef7;
+    }
+    .empty-search { grid-column: 1 / -1; color: var(--text-muted); font-size: 13px; padding: 18px 0; text-align: center; }
+
+    /* 最近使用 */
+    .recent-row { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; margin-top: 11px; }
+    .recent-label { font-size: 11.5px; color: var(--text-muted); font-weight: 600; }
+
+    /* 场景描述框 */
+    .prompt-box { margin-top: 14px; border-top: 1px dashed rgba(15, 23, 42, 0.1); padding-top: 12px; }
+    .pb-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 7px; }
+    .pb-head > span:first-child { font-size: 13px; font-weight: 700; color: #334155; }
+    .pb-note { font-size: 11.5px; line-height: 1.5; color: var(--text-muted); }
+
+    /* 设置区 */
+    .set-row { margin-top: 13px; }
+    .set-row:first-of-type { margin-top: 2px; }
+    .set-label { font-size: 12.5px; font-weight: 700; color: #475569; margin-bottom: 7px; }
+    .chip-row.compact { gap: 6px; }
+    .chip-row.compact .chip { font-size: 12.5px; padding: 6px 11px; }
+    .set-row-more { margin-top: 8px; }
+    .mini-select {
+      width: 100%; padding: 8px 10px; border-radius: 10px; font-size: 12.5px; color: #334155;
+      font-family: inherit; border: 1px solid rgba(226, 232, 240, 0.9); background: rgba(255, 255, 255, 0.75);
+      cursor: pointer;
+    }
+    .mini-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.14); }
+
+    /* 模型卡片（默认只露常用的 3 个，其余收纳进「更多模型」下拉） */
+    .model-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .mcard {
+      text-align: left; cursor: pointer; padding: 9px 10px; border-radius: 13px; font-family: inherit;
+      border: 1px solid rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.5); color: var(--text-main);
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      transition: all 0.22s var(--spring);
+    }
+    .mcard:hover { border-color: rgba(79, 110, 247, 0.4); background: rgba(255, 255, 255, 0.72); }
+    .mcard.active {
+      background: linear-gradient(135deg, #4f6ef7, #6f86fa); border-color: transparent; color: #fff;
+      box-shadow: 0 8px 18px rgba(79, 110, 247, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .mcard.wide { grid-column: 1 / -1; }
+    .mc-name { font-size: 13px; font-weight: 700; letter-spacing: 0.2px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .mc-def { font-size: 10px; font-weight: 800; color: #4f6ef7; background: rgba(79,110,247,.12); border-radius: 999px; padding: 1px 7px; line-height: 1.5; }
+    .mcard.active .mc-def { color: #fff; background: rgba(255,255,255,.24); }
+    .mc-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .mcard.active .mc-meta { color: rgba(255, 255, 255, 0.85); }
+
+    /* 高级微调折叠 */
+    details.adv { margin-top: 14px; border-top: 1px dashed rgba(15, 23, 42, 0.1); padding-top: 12px; }
+    details.adv > summary {
+      cursor: pointer; font-size: 12.5px; font-weight: 700; color: #475569; list-style: none;
+      display: flex; align-items: center; gap: 6px;
+    }
+    details.adv > summary::-webkit-details-marker { display: none; }
+    details.adv > summary::before { content: "▸"; display: inline-block; transition: transform 0.2s var(--spring); color: var(--primary); }
+    details.adv[open] > summary::before { transform: rotate(90deg); }
+    .adv-body { padding-top: 11px; }
+    .adv-note { font-size: 11.5px; color: var(--text-muted); margin-top: 9px; }
+
+    /* 配置摘要 */
+    .summary-box {
+      margin-top: 14px; border-radius: 14px; padding: 12px 13px;
+      background: rgba(79, 110, 247, 0.06); border: 1px solid rgba(79, 110, 247, 0.16);
+    }
+    .sum-line { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: #475569; padding: 2px 0; }
+    .sum-line b { color: #0f172a; font-weight: 700; text-align: right; }
+    .sum-line.warn b { color: #d97706; }
+    .side-submit { margin-top: 13px; }
+    .side-submit .btn { width: 100%; height: 40px; font-size: 15px; }
+    .file-count { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; font-weight: 500; }
+
+    /* 免费额度提示条（未绑定 Agnes Key 的员工） */
+    .quota-note { margin-top: 11px; font-size: 12px; line-height: 1.55; border-radius: 10px; padding: 8px 11px; display: none; }
+    .quota-note.warn { display: block; background: rgba(217,119,6,.08); border: 1px solid rgba(217,119,6,.25); color: #92400e; }
+    .quota-note.ok { display: block; background: rgba(22,163,74,.08); border: 1px solid rgba(22,163,74,.22); color: #166534; }
+    .quota-note b { font-weight: 700; }
+    .quota-note .q-act { cursor: pointer; text-decoration: underline; font-weight: 700; }
+    #poolTable .cell-mono { font-family: ui-monospace, Consolas, "Courier New", monospace; font-size: 12px; white-space: nowrap; }
+    #poolTable td { vertical-align: middle; }
+
     /* 全公司图片记录：缩略图单元格 */
     #adminImgTable .cell-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid rgba(15,23,42,.12); background: #f1f5f9; }
     #adminImgTable .cell-thumb:hover { box-shadow: 0 0 0 2px #4f6ef7; }
@@ -464,10 +609,33 @@
           <div id="regForm" class="hidden">
             <div class="form-row"><span>用户名（3-32 位）</span><input type="text" id="regUser" placeholder="用户名" /></div>
             <div class="form-row"><span>密码（至少 6 位）</span><input type="password" id="regPass" placeholder="密码" /></div>
-            <p class="modal-tip">首位注册的员工将自动成为管理员。</p>
+            <p class="modal-tip">首位注册的员工将自动成为管理员。注册后默认每天可免费生成 20 张场景图；登录后在右上角「🔑 API Key」绑定自己的 Agnes Key 可解锁不限量。</p>
             <div style="margin-top:14px;"><button class="btn btn-primary" style="width:100%;" onclick="doRegister()">注册</button></div>
           </div>
           <div class="modal-tip" id="authMsg" style="margin-top:12px;min-height:14px;"></div>
+        </div>
+      </div>
+
+      <!-- ===== 我的 API Key（员工自绑 Agnes Key） ===== -->
+      <div class="modal-overlay hidden" id="keyOverlay">
+        <div class="modal-card" style="max-width:560px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+            <div>
+              <div class="card-title" style="font-size:17px;">我的 API Key</div>
+              <div class="card-sub">绑定你自己的 Agnes Key：验证通过后，你的每次生图都优先用自己的 Key，<b>不占每日免费额度、不限量</b>，同时计入全公司 Key 池。</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="closeKeyModal()">✕ 关闭</button>
+          </div>
+          <div id="keyStatus"></div>
+          <div class="form-row"><span>Agnes API Key</span>
+            <input type="password" id="myAgnesKey" placeholder="粘贴你的 Agnes API Key（sk-…），留空不修改" autocomplete="off"/>
+          </div>
+          <div class="api-actions" style="margin-top:12px;">
+            <button class="btn btn-primary btn-sm" id="myKeyBtn" onclick="saveMyKey()">验证并保存</button>
+            <button class="btn btn-ghost btn-sm" id="myKeyDel" onclick="removeMyKey()">解绑</button>
+            <span class="api-status" id="myKeyStatus"></span>
+          </div>
+          <p class="modal-tip" style="margin-top:12px;">说明：① Key 只用于后台调用生成，界面一律掩码显示，管理员可见归属但与你的账号密码无关；② 未绑定时每天免费生成 <b id="keyLimitTip">20</b> 张；③ 绑定后想换 Key 直接粘贴新的再「验证并保存」即可覆盖。</p>
         </div>
       </div>
 
@@ -483,71 +651,103 @@
         <div id="tabConsole" class="anim-view">
           <div class="view-head">
             <div class="view-title">批量生成控制台</div>
-            <div class="view-sub">上传白底产品图，填入统一的场景提示词，系统将以严格流控（≤8 RPM）依次生成场景图。</div>
+            <div class="view-sub">三步出图：<b>① 选场景 → ② 传产品图 → ③ 开始生成</b>。系统自动注入主体保真锁、物理防畸变与商业级画质约束，产品主体 / 材质 / Logo 不变，只换背景与环境光影。</div>
           </div>
-          <div class="glass-card">
-            <div class="card-title">新建生成任务</div>
-            <div class="card-sub">系统会在你提交的提示词基础上 <b>自动注入「保真锁」</b> 与高品质商业摄影修饰词，确保原产品主体 / 材质 / Logo 不变，仅替换背景与环境光影。</div>
 
-            <div class="form-row">
-              <span>生图模型</span>
-              <select id="modelSel" class="glass-select" onchange="updateModelPriceHint()">
-                <option value="">加载中…</option>
-              </select>
-              <div class="price-hint" id="modelPriceHint"></div>
-              <div class="model-desc" id="modelDesc"></div>
-            </div>
+          <div class="console-grid">
+            <!-- ========== 左栏：主流程 ========== -->
+            <div class="console-main">
+              <section class="glass-card step-card">
+                <div class="step-head">
+                  <span class="step-no">1</span>
+                  <div>
+                    <div class="card-title">选场景</div>
+                    <div class="card-sub" style="margin-bottom:0;">点卡片即选中，描述自动填入下方文本框，可继续微调；支持搜索与分类筛选。</div>
+                  </div>
+                </div>
+                <div class="scene-toolbar">
+                  <input id="sceneSearch" class="glass-input" type="text" placeholder="🔍 搜索场景：白底 / 原木 / 海边 / 鬼节 / 春天 …" oninput="sceneQuery=this.value;renderSceneLibrary()" />
+                  <div class="chip-row" id="sceneCatTabs"></div>
+                </div>
+                <div class="recent-row hidden" id="sceneRecent"></div>
+                <div class="scene-grid" id="sceneGrid"></div>
+                <div class="env-hint empty" id="sceneHint"></div>
+                <div class="prompt-box">
+                  <div class="pb-head">
+                    <span>场景描述（自动填入，可微调）</span>
+                    <span class="pb-note">提交后后端自动叠加：主体保真锁 · 物理防畸变 · 商业级画质；选「节日季节」时额外注入居中构图锁</span>
+                  </div>
+                  <textarea id="prompt" rows="3" placeholder="先从上方选一个场景，或在此直接描述你想要的环境。" oninput="markPromptDirty()"></textarea>
+                </div>
+              </section>
 
-            <div class="form-row">
-              <span>生成模式</span>
-              <div class="chip-row" id="modeChips">
-                <button type="button" class="chip active" data-mode="single" onclick="selectMode('single',this)">🅰️ 模式A · 单图批量</button>
-                <button type="button" class="chip" data-mode="multi_angle_fusion" onclick="selectMode('multi_angle_fusion',this)">🅱️ 模式B · 多角度合成</button>
-              </div>
-              <div class="env-hint" id="modeHint"></div>
-            </div>
-
-            <div class="form-row">
-              <span>输出图片比例（比例指引注入提示词，模型自然扩展场景，不再物理塞白边）</span>
-              <div class="chip-row" id="ratioChips">
-                <button type="button" class="chip" data-ratio="" onclick="selectRatio('',this)">原图比例</button>
-                <button type="button" class="chip" data-ratio="1:1" onclick="selectRatio('1:1',this)">1:1 正方</button>
-                <button type="button" class="chip active" data-ratio="4:3" onclick="selectRatio('4:3',this)">4:3 横</button>
-                <button type="button" class="chip" data-ratio="3:4" onclick="selectRatio('3:4',this)">3:4 竖</button>
-                <button type="button" class="chip" data-ratio="16:9" onclick="selectRatio('16:9',this)">16:9 宽屏</button>
-                <button type="button" class="chip" data-ratio="9:16" onclick="selectRatio('9:16',this)">9:16 竖屏</button>
-              </div>
-              <div class="env-hint" id="ratioHint"></div>
-            </div>
-
-            <div class="form-row">
-              <span>高转化预设场景库（点击一键填入，可继续微调）</span>
-              <div class="preset-groups" id="presetGroups"></div>
-            </div>
-
-            <div class="form-row">
-              <span>镜头视角（点击追加 / 取消，作用于提示词末尾）</span>
-              <div class="chip-row" id="lensMods"></div>
-            </div>
-
-            <div class="form-row">
-              <span>光影氛围（点击追加 / 取消，作用于提示词末尾）</span>
-              <div class="chip-row" id="lightMods"></div>
+              <section class="glass-card step-card">
+                <div class="step-head">
+                  <span class="step-no">2</span>
+                  <div>
+                    <div class="card-title">上传产品图</div>
+                    <div class="card-sub" style="margin-bottom:0;" id="uploadLabel">白底产品图，可一次选多张；切到「多角度合成」时请传 2~4 张同一产品的不同角度图。</div>
+                  </div>
+                </div>
+                <div class="drop" id="dropZone" onclick="document.getElementById('files').click()">
+                  点击选择图片，或将文件拖拽到此（<strong>支持批量</strong>）
+                </div>
+                <input type="file" id="files" multiple accept="image/*" class="hidden" onchange="onFiles(this)" />
+                <div class="thumb-grid" id="thumbGrid"></div>
+                <div class="file-count" id="fileCount"></div>
+              </section>
             </div>
 
-            <div class="form-row"><span>统一场景生成提示词</span>
-              <textarea id="prompt" rows="3" placeholder="例如：将产品放置在现代简约风格的木桌上，自然光从左上方打来，背景虚化绿植，商业产品摄影风格。" oninput="selectedWhiteBg=false"></textarea>
-              <div class="prompt-note">✓ 提交后后端自动注入四层约束：① 主体保真锁 ② 物理防畸变（落地 / 真实比例 / 85mm 透视）③ 你的场景 ④ 商业级画质，无需手动书写。</div>
-            </div>
-            <div class="form-row"><span id="uploadLabel">上传白底产品图（可多选）</span></div>
-            <div class="drop" id="dropZone" onclick="document.getElementById('files').click()">
-              点击选择图片，或将文件拖拽到此（<strong>支持批量</strong>）
-            </div>
-            <input type="file" id="files" multiple accept="image/*" class="hidden" onchange="onFiles(this)" />
-            <div class="thumb-grid" id="thumbGrid"></div>
-            <div class="form-row"><span id="fileCount" style="color:var(--text-muted);"></span></div>
-            <div style="margin-top:14px;"><button class="btn btn-primary" id="submitBtn" onclick="createTask()">开始生成</button></div>
-            <div class="modal-tip" id="createMsg" style="margin-top:10px;min-height:14px;"></div>
+            <!-- ========== 右栏：生成设置（常驻侧栏，默认只露常用项） ========== -->
+            <aside class="console-side">
+              <section class="glass-card step-card sticky-side">
+                <div class="step-head">
+                  <span class="step-no">3</span>
+                  <div><div class="card-title">生成设置</div></div>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-label">生图模型</div>
+                  <div class="model-cards" id="modelCards"></div>
+                  <div class="set-row-more" id="modelMoreWrap" style="display:none;">
+                    <select id="modelMore" class="mini-select" onchange="selectModel(this.value)"></select>
+                  </div>
+                  <div class="price-hint" id="modelPriceHint"></div>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-label">输出比例</div>
+                  <div class="chip-row compact" id="ratioChips"></div>
+                </div>
+
+                <div class="set-row">
+                  <div class="set-label">生成模式</div>
+                  <div class="chip-row compact" id="modeChips">
+                    <button type="button" class="chip active" data-mode="single" onclick="selectMode('single',this)">🅰️ 单图批量</button>
+                    <button type="button" class="chip" data-mode="multi_angle_fusion" onclick="selectMode('multi_angle_fusion',this)">🅱️ 多角度合成</button>
+                  </div>
+                  <div class="env-hint empty" id="modeHint"></div>
+                </div>
+
+                <details class="adv" id="advBox">
+                  <summary>高级微调（镜头 / 光影）</summary>
+                  <div class="adv-body">
+                    <div class="set-label">镜头视角</div>
+                    <div class="chip-row compact" id="lensMods"></div>
+                    <div class="set-label" style="margin-top:10px;">光影氛围</div>
+                    <div class="chip-row compact" id="lightMods"></div>
+                    <div class="adv-note">点击追加 / 取消，作用于场景描述末尾。</div>
+                  </div>
+                </details>
+
+                <div class="summary-box" id="summaryBox"></div>
+                <div class="quota-note" id="quotaNote"></div>
+                <div class="side-submit">
+                  <button class="btn btn-primary" id="submitBtn" onclick="createTask()">开始生成</button>
+                </div>
+                <div class="modal-tip" id="createMsg" style="margin-top:8px;min-height:14px;"></div>
+              </section>
+            </aside>
           </div>
 
           <div class="glass-card" id="consoleProgress" style="display:none;">
@@ -599,12 +799,68 @@
                 <input type="text" id="apiModel" placeholder="gemini-2.5-flash-image"/>
               </label>
             </div>
+            <label class="field-inline" style="margin:12px 0 2px; gap:8px; cursor:pointer;">
+              <input type="checkbox" id="enableGeminiChk" style="width:16px;height:16px;accent-color:#4f6ef7;cursor:pointer;"/>
+              <span><b>启用 Gemini 模型</b>（默认关闭：员工端不可见也不可使用 Gemini；开启后务必先配置上方 Gemini Key，保存立即生效）</span>
+            </label>
             <div class="api-actions">
               <button class="btn btn-primary btn-sm" onclick="saveApiSettings()">保存配置</button>
               <button class="btn btn-ghost btn-sm" onclick="testApiSettings()">测试连接</button>
               <span class="api-status" id="apiStatus"></span>
             </div>
             <p class="modal-tip" id="apiKeyHint"></p>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-title">Agnes AI 配置（图生图 · 国内节点）</div>
+            <div class="card-sub">粘贴 Agnes AI API Key 与国内节点地址，保存后立即生效（无需重启）。当前官方免费。模型已在「生图模型」下拉中可选（agnes-image-2.1-flash / 2.5-flash）。下方档位决定 RPM 限速，系统已内置令牌桶按官方配额精确限速，不会超限。</div>
+            <div class="form-grid">
+              <label class="field">
+                <span class="field-label">Agnes API Key</span>
+                <input type="password" id="agnesKey" placeholder="粘贴你的 Agnes AI API Key" autocomplete="off"/>
+              </label>
+              <label class="field">
+                <span class="field-label">Agnes 节点（Base URL）</span>
+                <input type="text" id="agnesBase" placeholder="https://apihub.agnes-ai.cn/v1"/>
+              </label>
+              <label class="field">
+                <span class="field-label">账户档位（RPM 配额）</span>
+                <select id="agnesTier" onchange="updateAgnesRpmHint()">
+                  <option value="default">默认 Default（1K=20 / 2K=10 / 3K·4K=1 RPM）</option>
+                  <option value="enterprise">企业版 Enterprise（1K=40 / 2K=20 / 3K·4K=1 RPM）</option>
+                  <option value="tokenplan">Token Plan（1K=100 / 2K=80 / 3K·4K=1 RPM）</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field-label">分辨率档位（出图尺寸）</span>
+                <select id="agnesSize" onchange="updateAgnesRpmHint()">
+                  <option value="1K">1K（最快，RPM 最高）</option>
+                  <option value="2K">2K</option>
+                  <option value="3K">3K（每分钟仅约 1 张）</option>
+                  <option value="4K">4K（每分钟仅约 1 张）</option>
+                </select>
+              </label>
+            </div>
+            <p class="modal-tip" id="agnesRpmHint"></p>
+            <div class="api-actions">
+              <button class="btn btn-primary btn-sm" onclick="saveApiSettings()">保存配置</button>
+              <button class="btn btn-ghost btn-sm" onclick="testApiSettings('agnes')">测试连接</button>
+              <span class="api-status" id="agnesStatus"></span>
+            </div>
+            <p class="modal-tip" id="agnesKeyHint"></p>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-title">Agnes Key 池 <span class="api-status" id="poolStat" style="font-weight:600;"></span></div>
+            <div class="card-sub">员工在右上角「🔑 API Key」绑定且<b>验证成功</b>的 Agnes Key 会自动计入此池（显示归属用户名）；管理员可在此直接添加「系统 Key」。生图时按「自有 Key → 系统 Key → 池内轮换」取用；<b>未绑定 Key 的员工每天最多免费生成 20 张</b>，绑定后不限量。</div>
+            <div class="form-row" style="margin:12px 0 10px; gap:8px;">
+              <input type="password" id="newSysKey" class="glass-input" style="flex:1;" placeholder="粘贴要加入池的系统 Agnes Key（sk-…），入池后可在下方「测试」验证" autocomplete="off"/>
+              <button class="btn btn-primary btn-sm" onclick="addSysKey()">加入池</button>
+              <button class="btn btn-ghost btn-sm" onclick="loadAdminKeys()">刷新</button>
+            </div>
+            <div class="table-wrap">
+              <table id="poolTable"><thead><tr><th>掩码 Key</th><th>归属</th><th>来源</th><th>状态</th><th>验证时间</th><th>最近使用</th><th>备注</th><th>操作</th></tr></thead><tbody></tbody></table>
+            </div>
           </div>
 
           <div class="glass-card">
@@ -734,11 +990,11 @@ async function enterApp(){
   document.getElementById("appArea").classList.remove("hidden");
   try { await fetchMe(); } catch(e){ location.reload(); return; }
   document.getElementById("userBox").innerHTML =
-    `<span class="top-user">${meUser.username}</span> ${meUser.role==="admin"?'<span class="role-badge">管理员</span>':''} <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>`;
+    `<span class="top-user">${meUser.username}</span> ${meUser.role==="admin"?'<span class="role-badge">管理员</span>':''} <button class="btn btn-ghost btn-sm" onclick="openKeyModal()">🔑 API Key</button> <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>`;
   document.getElementById("navAdmin").classList.toggle("hidden", meUser.role!=="admin");
-  renderPresetChips();
   loadConfig();
   showTab("console");
+  refreshProfile();
   startPolling();
 }
 
@@ -808,244 +1064,407 @@ function selectMode(mode, btn){
   const el=document.getElementById("modeHint");
   if(mode==="multi_angle_fusion"){
     el.className="env-hint";
-    el.innerHTML="<b>🅱️ 多角度合成模式</b>：上传 2~4 张同一产品的不同角度图，系统一次性提交并融合生成 <b>1 张</b> 统一场景图（产出 1 张）。";
-  } else {
-    el.className="env-hint empty"; el.innerHTML="";
-  }
+    el.innerHTML="<b>🅱️ 多角度合成</b>：上传 2~4 张同一产品的不同角度图，系统融合产出 <b>1 张</b> 场景图。";
+  } else { el.className="env-hint empty"; el.innerHTML=""; }
   updateUploadLabel();
+  updateSummary();
 }
 
-/* ---------- 预设场景库 / 修饰器 / 模型 ---------- */
-let selectedRatio = "4:3";   // 默认 4:3 横向；'' = 原图比例；其余 '1:1' / '3:4' / '16:9' / '9:16'
-let selectedModifiers = new Set();  // 已选中的镜头 / 光影修饰词（含前导 ", "）
-let selectedWhiteBg = false;  // 纯白底模式：选 A 组纯白预设时为 true，提交时传给后端切换 Layer2/4
+/* ==========================================================================
+   控制台状态（场景 / 模型 / 比例 / 模式 / 微调修饰器）
+   场景库、修饰器、比例全部来自 /api/config（后端 app/presets.py 为唯一数据源），
+   前端不硬编码任何提示词 —— 加场景只改后端，重启即生效。
+   ========================================================================== */
+let selectedRatio = "4:3";        // 输出比例；"" = 原图比例
+let selectedModel = "";           // 当前生图模型（默认取后台配置的 default_model）
+let selectedModifiers = new Set();// 已追加到描述末尾的镜头 / 光影短语
+let selectedWhiteBg = false;      // 纯白底模式（选白底场景时自动开启）
+let selectedTheme = null;         // 节日/季节主题：null | "ghost" | "spring" | "autumn"
+let selectedThemeRandom = false;  // true = 逐张随机组合变体
 
-// 比例 -> 注入提示词的英文指引（模型据此自然扩展场景以匹配比例，不再物理塞白边）
-const RATIO_PROMPTS = {
-  "1:1":  "composition framed in a 1:1 square aspect ratio",
-  "4:3":  "composition framed in a 4:3 landscape aspect ratio",
-  "3:4":  "composition framed in a 3:4 portrait aspect ratio",
-  "16:9": "composition framed in a 16:9 wide landscape aspect ratio",
-  "9:16": "composition framed in a 9:16 vertical aspect ratio",
+let SCENE_CATEGORIES = [];        // 分类筛选 Tab
+let SCENE_LIBRARY = [];           // 全部可选场景
+let MODIFIERS = { lens: [], light: [] };
+let RATIO_OPTIONS = [];
+let RATIO_PROMPTS = {};
+let sceneCat = "all";             // 当前分类筛选
+let sceneQuery = "";              // 搜索关键词
+let selectedScene = null;         // 当前选中的场景对象
+
+const RECENT_KEY = "bps_recent_scenes";
+let recentScenes = [];
+try { recentScenes = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch(e) { recentScenes = []; }
+
+// 默认常驻展示的模型卡（其余收纳进「更多模型」下拉，避免一屏塞满 7 个选项）
+const MODEL_CARD_IDS = ["agnes-image-2.5-flash", "agnes-image-2.1-flash", "agnes-image-2.0-flash", "gemini-2.5-flash-image"];
+const MODEL_SHORT = {
+  "agnes-image-2.5-flash": "Agnes 2.5",
+  "agnes-image-2.1-flash": "Agnes 2.1",
+  "agnes-image-2.0-flash": "Agnes 2.0",
+  "gemini-2.5-flash-image": "Gemini 2.5",
+  "gemini-3.1-flash-image": "Gemini 3.1",
+  "gemini-3.1-flash-lite-image": "Gemini 3.1 Lite",
+  "imagen-3.0-generate-002": "Imagen 3.0",
 };
 
-// 十大高转化电商预设场景库（分组：纯白规范主图 / 室内家居 / 室外自然与街头）
-const PRESET_GROUPS = [
-  { title:"A · 电商规范主图（纯白系列）", items:[
-    { label:"⚪ 电商纯白底（带真实地影）", white:true, text:"Isolate the product on a completely pure solid white background (RGB 255, 255, 255), seamless studio backdrop, subtle and soft realistic contact shadow underneath the base, professional commercial studio lighting, high-contrast, razor-sharp clean edges, zero background artifacts, crisp 8k e-commerce listing photography." },
-    { label:"✂️ 纯白无影抠图底", white:true, text:"Extract and isolate the exact product onto an absolute pure blank white background (hex #FFFFFF), perfectly flat solid background, no shadows, no reflections, pin-sharp contour edges, clean isolation cutout style." },
-  ]},
-  { title:"B · 室内生活与家居", items:[
-    { label:"🏠 温馨现代室内", text:"placed naturally on a clean neutral-toned tabletop inside a modern cozy interior, soft ambient warm sunlight coming from a nearby window, blurred contemporary home background with subtle aesthetic decor, realistic contact shadows, f/2.8 shallow depth of field." },
-    { label:"🪵 极简原木家居", text:"placed on a natural light-oak wooden table, soft morning sunlight casting gentle shadows, blurred minimalist warm living room background, clean organic texture." },
-    { label:"🏛️ 奢华大理石台面", text:"placed on a smooth white Carrara marble pedestal, luxury bathroom countertop, soft diffused studio lighting, subtle water ripples, elegant high-end commercial ad." },
-    { label:"💼 现代办公桌面", text:"placed on a clean dark grey matte office desk, next to a subtle laptop edge and small succulent plant, modern bright office ambient lighting, crisp focus." },
-  ]},
-  { title:"C · 室外全维度自然与街头", items:[
-    { label:"🌲 自然林间草木", text:"placed securely on a rustic natural stone platform outdoors, surrounded by fresh lush greenery and subtle wild grass, soft golden hour sunlight filtering naturally through the background, authentic outdoor environment with rich atmospheric depth." },
-    { label:"🏖️ 海边沙滩阳光", text:"placed firmly on dry fine golden sand next to a smooth ocean pebble, crisp natural outdoor sunlight from a 45-degree angle casting realistic contact shadows beneath the base, subtle turquoise sea waves and sunny sky gently blurred in the far background." },
-    { label:"🏕️ 户外露营木台", text:"resting naturally on a weathered rustic cedar picnic table, accurate physical scale with realistic wood grain texture, soft ambient daylight filtering through pine trees, subtle pine cones creating scale reference, razor-sharp contact shadows." },
-    { label:"🏙️ 现代街头水泥台", text:"placed securely on a clean industrial architectural concrete ledge outdoors, bright overcast daylight providing balanced natural reflections, blurred modern glass architecture and street trees in the background, sharp grounded shadows." },
-  ]},
-];
-
-// 镜头视角修饰器（点击追加 / 取消，作用于提示词末尾）
-const LENS_MODIFIERS = [
-  { label:"👁️ 经典平视", text:", eye-level front view" },
-  { label:"📐 35°微俯视", text:", 35-degree high-angle commercial product shot" },
-  { label:"🔍 微距特写", text:", close-up macro product lens" },
-];
-// 光影氛围修饰器（点击追加 / 取消，作用于提示词末尾）
-const LIGHT_MODIFIERS = [
-  { label:"☀️ 柔和自然晨光", text:", soft diffused morning sunlight" },
-  { label:"💡 摄影棚专业侧光", text:", professional 45-degree studio side lighting" },
-  { label:"🌇 温暖黄昏光影", text:", warm golden hour sunset lighting" },
-  { label:"⚡ 戏剧感硬光高反差", text:", dramatic high-contrast studio lighting with crisp geometric shadows" },
-];
-
-function selectEnv(){ /* 已弃用：环境分类改由十大预设场景库直接覆盖，保留空函数以兼容旧调用 */ }
-
-/* ---------- 预设场景一键填入 ---------- */
+function shortModelName(id){ return MODEL_SHORT[id] || (id || "-"); }
+function modelMeta(m){
+  if(!m) return "";
+  return m.provider === "agnes" ? "免费 · 图生图" : (m.unit_price_usd != null ? "$" + m.unit_price_usd.toFixed(4) + "/张" : "未计费");
+}
 function getLiteModelId(){
-  // 匹配「3.1 lite」模型（当前为 gemini-3.1-flash-lite-image）；找不到则取目录第一项
   const c = window.MODEL_CATALOG || [];
-  const hit = c.find(m=>/flash-lite/i.test(m.id));
-  return hit ? hit.id : (c[0] ? c[0].id : "");
+  const hit = c.find(m => /flash-lite/i.test(m.id));
+  return hit ? hit.id : "";
 }
 function forceLiteModel(){
-  // 纯白抠图预设默认强制走 3.1 lite 模型；若下拉尚未填充则延后到 loadConfig 应用
+  // 纯白抠图场景：若 Gemini 已被管理员开放（且含 lite 模型）则优先切 lite 保真；
+  // Gemini 未开放时 lite 不在目录中 → 保持当前模型（Agnes 等）。
   const lite = getLiteModelId();
-  const sel = document.getElementById("modelSel");
-  if(!sel || !lite) return;
-  if([...sel.options].some(o=>o.value===lite)){ sel.value=lite; updateModelPriceHint(); }
-  else { window._pendingLite = lite; }
-}
-function fillPreset(text, btn, white){
-  const ta=document.getElementById("prompt"); ta.value=text;
-  // 框内容已整体替换为该预设场景，修饰器需复位；比例复位为默认 4:3 横向，避免与旧内容混淆
-  selectedRatio="4:3"; syncRatioChips();
-  const rh=document.getElementById("ratioHint"); rh.className="env-hint empty"; rh.innerHTML="";
-  selectedModifiers.clear();
-  selectedWhiteBg = !!white;  // A 组纯白预设 -> 纯白底模式，后端据此切换 Layer2/4
-  document.querySelectorAll("#lensMods .chip, #lightMods .chip").forEach(c=>c.classList.remove("active"));
-  document.querySelectorAll("#presetGroups .chip").forEach(c=>c.classList.remove("active"));
-  btn.classList.add("active");
-  if(white) forceLiteModel();  // 纯白抠图预设默认强制走 3.1 lite 模型
-  showToast(white ? "已填入纯白底预设（纯白底模式已开启，已默认切换 3.1 Lite 模型）" : "已填入场景预设，可继续微调比例 / 镜头 / 光影");
+  if(!lite || selectedModel === lite) return false;
+  selectedModel = lite;
+  renderModelCards(); updateModelPriceHint(); updateSummary();
+  return true;
 }
 
-/* ---------- 镜头 / 光影修饰器（追加 / 取消） ---------- */
-function toggleModifier(text, btn){
-  const ta=document.getElementById("prompt"); let v=ta.value||"";
-  if(v.includes(text)){
-    v=v.split(text).join("").replace(/,\s*,/g,",").replace(/^\s*,\s*/,"").replace(/\s*,\s*$/,"").trim();
-    ta.value=v; btn.classList.remove("active"); selectedModifiers.delete(text);
+/* ---------- 场景库渲染 ---------- */
+function sceneMatches(s){
+  if(sceneCat !== "all" && s.category !== sceneCat) return false;
+  const q = (sceneQuery || "").trim().toLowerCase();
+  if(!q) return true;
+  return (s.name + " " + s.summary + " " + (s.keywords||"") + " " + (s.emoji||"")).toLowerCase().includes(q);
+}
+function renderSceneCatTabs(){
+  const box = document.getElementById("sceneCatTabs"); box.innerHTML = "";
+  const tabs = [{ key:"all", label:"全部", emoji:"🗂️" }].concat(SCENE_CATEGORIES);
+  tabs.forEach(t=>{
+    const b=document.createElement("button"); b.type="button";
+    b.className = "chip" + (sceneCat===t.key ? " active" : "");
+    b.textContent = (t.emoji ? t.emoji + " " : "") + t.label;
+    if(t.description) b.title = t.description;
+    b.onclick = ()=>{ sceneCat = t.key; renderSceneLibrary(); };
+    box.appendChild(b);
+  });
+}
+function renderRecentScenes(){
+  const box = document.getElementById("sceneRecent");
+  const items = recentScenes.map(k => SCENE_LIBRARY.find(s => s.key === k)).filter(Boolean).slice(0, 6);
+  if(!items.length){ box.className = "recent-row hidden"; box.innerHTML = ""; return; }
+  box.className = "recent-row"; box.innerHTML = "";
+  const lb = document.createElement("span"); lb.className = "recent-label"; lb.textContent = "最近使用"; box.appendChild(lb);
+  items.forEach(s=>{
+    const b=document.createElement("button"); b.type="button";
+    b.className = "chip" + (selectedScene && selectedScene.key===s.key ? " active" : "");
+    b.textContent = (s.emoji||"") + " " + s.name;
+    b.onclick = ()=>selectSceneByKey(s.key);
+    box.appendChild(b);
+  });
+}
+function renderSceneLibrary(){
+  if(!document.getElementById("sceneGrid")) return;
+  renderSceneCatTabs();
+  const grid = document.getElementById("sceneGrid"); grid.innerHTML = "";
+  const list = SCENE_LIBRARY.filter(sceneMatches);
+  if(!list.length){
+    grid.innerHTML = '<div class="empty-search">没有匹配的场景，换个关键词试试（白底 / 木 / 海 / 春 / 秋 / 鬼）。</div>';
+  }
+  list.forEach(s=>{
+    const b=document.createElement("button"); b.type="button";
+    b.className = "scene-card" + (selectedScene && selectedScene.key===s.key ? " active" : "");
+    b.innerHTML =
+      '<div class="sc-emoji">' + (s.emoji||"🖼️") + '</div>' +
+      '<div class="sc-name">' + s.name + '</div>' +
+      '<div class="sc-sum">' + (s.summary||"") + '</div>' +
+      '<div class="sc-check">✓</div>';
+    b.title = s.summary || s.name;
+    b.onclick = ()=>selectScene(s);
+    grid.appendChild(b);
+  });
+  renderRecentScenes();
+}
+function selectSceneByKey(key){
+  const s = SCENE_LIBRARY.find(x=>x.key===key);
+  if(s) selectScene(s);
+}
+function rememberScene(key){
+  recentScenes = [key].concat(recentScenes.filter(k=>k!==key)).slice(0, 6);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(recentScenes)); } catch(e){}
+}
+function resetScene(){
+  // 任务提交后复位场景/主题/修饰器，避免下一批误带上一次的选择
+  selectedScene = null;
+  selectedTheme = null; selectedThemeRandom = false;
+  selectedWhiteBg = false;
+  selectedModifiers.clear(); syncModifierChips();
+  renderSceneLibrary(); updateSceneHint(); updateSummary();
+}
+
+/* ---------- 选中场景 ---------- */
+function selectScene(s){
+  selectedScene = s;
+  selectedModifiers.clear(); syncModifierChips();
+  selectedWhiteBg = !!s.white_bg;
+  if(s.theme){ selectedTheme = s.theme; selectedThemeRandom = !!s.random; }
+  else { selectedTheme = null; selectedThemeRandom = false; }
+  const forcedLite = s.white_bg ? forceLiteModel() : false;
+
+  if(s.random){
+    fillSceneText("");                 // 随机变体：文本框仅作预览，生成时后端逐张组合
+    fetchScenePreview(s.theme, s.key);
+    showToast("已开启" + s.name + "：每张图独立随机组合");
   } else {
-    ta.value=(v.trim()? v.trim():"") + text; btn.classList.add("active"); selectedModifiers.add(text);
+    fillSceneText(s.prompt || "");
+    showToast(forcedLite
+      ? "已选择 " + s.name + "：已自动切到「" + shortModelName(selectedModel) + "」提升抠图保真，可点模型卡手动换回"
+      : "已选择场景：" + s.name);
+  }
+  renderSceneLibrary(); updateSceneHint(); updateSummary(); rememberScene(s.key);
+}
+async function fetchScenePreview(theme, key){
+  try{
+    const r = await api("GET", "/api/scenes/preview?theme=" + encodeURIComponent(theme));
+    if(r.ok){
+      const d = await r.json();
+      // 用户可能已切到别的场景，仅在仍选中该场景时写入
+      if(selectedScene && selectedScene.key === key) fillSceneText(d.prompt);
+    }
+  }catch(e){ /* 拉取失败不影响提交：后端生成时仍会随机组合 */ }
+}
+function fillSceneText(text){
+  const ta = document.getElementById("prompt");
+  ta.value = text || "";
+  applyRatioToPrompt();     // 保留当前比例短语
+}
+function markPromptDirty(){ /* 手动编辑描述：保留已选场景对应的模式（白底 / 主题），不做强制复位 */ }
+
+function updateSceneHint(){
+  const el = document.getElementById("sceneHint"); if(!el) return;
+  const s = selectedScene;
+  if(!s){ el.className = "env-hint empty"; el.innerHTML = ""; return; }
+  el.className = "env-hint";
+  if(s.theme){
+    const t = (window.THEME_CATALOG || []).find(x => x.key === s.theme);
+    if(s.random){
+      el.innerHTML = '<b>' + s.emoji + " " + s.name + '</b>：提交后<b>每张图独立随机组合</b>（共 ' +
+        (t ? t.combinations : "多种") + ' 种组合，seed 可复现），批量不重样，并自动注入<b>居中构图锁</b>（产品居中、不裁切、不被遮挡）。';
+    } else {
+      el.innerHTML = '<b>' + s.emoji + " " + s.name + '</b>：' + (s.summary||"") +
+        ' 已注入<b>居中构图锁</b>与主题氛围约束，全批次统一该场景。';
+    }
+  } else if(s.white_bg){
+    el.innerHTML = '<b>' + s.emoji + " " + s.name + '</b>：' + (s.summary||"") +
+      '。已开启<b>纯白底模式</b>（后端切换为无杂色背景 + 高反差棚拍画质）。';
+  } else {
+    el.innerHTML = '<b>' + s.emoji + " " + s.name + '</b>：' + (s.summary||"");
   }
 }
 
-/* ---------- 一键复制提示词 ---------- */
-function copyPrompt(text){
-  const t=(text||"").toString();
-  if(!t.trim()) return showToast("该记录暂无提示词");
-  const done=()=>showToast("✓ 已复制提示词");
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(t).then(done).catch(()=>fallbackCopy(t,done));
-  } else fallbackCopy(t,done);
+/* ---------- 模型 ---------- */
+function renderModelCards(){
+  const box = document.getElementById("modelCards"); if(!box) return;
+  box.innerHTML = "";
+  const cat = window.MODEL_CATALOG || [];
+  const cards = MODEL_CARD_IDS.map(id => cat.find(m => m.id === id)).filter(Boolean);
+  const rest = cat.filter(m => MODEL_CARD_IDS.indexOf(m.id) < 0);
+  // 后台配置的默认模型若不在常用卡里，提到卡片首位，保证默认可见、可选
+  const def = window.DEFAULT_MODEL;
+  if(def && !cards.some(m => m.id === def)){
+    const dm = cat.find(m => m.id === def);
+    if(dm){ cards.unshift(dm); const i = rest.findIndex(m => m.id === def); if(i >= 0) rest.splice(i, 1); }
+  }
+  cards.forEach((m, i)=>{
+    const b=document.createElement("button"); b.type="button";
+    const lastOdd = (cards.length % 2 === 1 && i === cards.length - 1);
+    b.className = "mcard" + (selectedModel===m.id ? " active" : "") + (lastOdd ? " wide" : "");
+    const isDef = (m.id === window.DEFAULT_MODEL);
+    b.innerHTML = '<div class="mc-name">' + shortModelName(m.id) + (isDef ? '<span class="mc-def">默认</span>' : "") + '</div><div class="mc-meta">' + modelMeta(m) + '</div>';
+    b.title = m.label + (m.description ? " —— " + m.description : "") + (isDef ? "（系统默认，管理员可在后台调整）" : "");
+    b.onclick = ()=>selectModel(m.id);
+    box.appendChild(b);
+  });
+  const wrap = document.getElementById("modelMoreWrap");
+  const sel = document.getElementById("modelMore");
+  if(!wrap || !sel) return;
+  sel.innerHTML = "";
+  if(rest.length){
+    wrap.style.display = "";
+    const ph=document.createElement("option"); ph.value=""; ph.textContent="更多模型…"; sel.appendChild(ph);
+    rest.forEach(m=>{
+      const o=document.createElement("option"); o.value=m.id;
+      o.textContent = shortModelName(m.id) + " · " + modelMeta(m);
+      sel.appendChild(o);
+    });
+    sel.value = cards.some(m => m.id === selectedModel) ? "" : (selectedModel || "");
+  } else {
+    wrap.style.display = "none";
+  }
 }
-function fallbackCopy(text, cb){
-  const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
-  document.body.appendChild(ta); ta.select();
-  try { document.execCommand("copy"); cb(); } catch(e){ showToast("复制失败，请手动复制"); }
-  document.body.removeChild(ta);
+function selectModel(id){
+  if(!id){ renderModelCards(); return; }   // 点了「更多模型…」占位项
+  selectedModel = id;
+  renderModelCards(); updateModelPriceHint(); updateSummary();
+}
+function updateModelPriceHint(){
+  const el = document.getElementById("modelPriceHint"); if(!el) return;
+  const m = (window.MODEL_CATALOG || []).find(x => x.id === selectedModel);
+  if(!m){ el.textContent = ""; return; }
+  el.innerHTML = (m.unit_price_usd != null)
+    ? '单价 <b>$' + m.unit_price_usd.toFixed(4) + '</b> / 张（图生图：1 输入图 + 1 输出图，约 ¥' + m.unit_price_cny.toFixed(3) + '）'
+    : '该模型当前免费，本次生成不计费。';
 }
 
 /* ---------- 输出比例 ---------- */
-function selectRatio(ratio, btn){
-  selectedRatio = ratio;
-  [...document.getElementById("ratioChips").children].forEach(c=>c.classList.toggle("active", c.dataset.ratio===ratio));
-  applyRatioToPrompt();
-  const el=document.getElementById("ratioHint");
-  if(!ratio){ el.className="env-hint empty"; el.innerHTML=""; return; }
-  el.className="env-hint";
-  el.innerHTML = `<b>已选「${ratio}」</b>：提交时将在提示词注入比例指引（<i>composition framed in a ${ratio} ...</i>），由模型在生成场景时自然扩展环境以匹配该比例，<b>不再物理塞白边</b>；对应短语已写入上方提示词框。`;
+function renderRatioChips(){
+  const box = document.getElementById("ratioChips"); if(!box) return;
+  box.innerHTML = "";
+  RATIO_OPTIONS.forEach(r=>{
+    const b=document.createElement("button"); b.type="button";
+    b.className = "chip" + (selectedRatio===r.value ? " active" : "");
+    b.dataset.ratio = r.value; b.textContent = r.label;
+    if(r.hint) b.title = r.hint;
+    b.onclick = ()=>selectRatio(r.value);
+    box.appendChild(b);
+  });
 }
-function syncRatioChips(){
-  [...document.getElementById("ratioChips").children].forEach(c=>c.classList.toggle("active", c.dataset.ratio===selectedRatio));
+function selectRatio(v){
+  selectedRatio = v;
+  [...document.getElementById("ratioChips").children].forEach(c=>c.classList.toggle("active", c.dataset.ratio===v));
+  applyRatioToPrompt(); updateSummary();
 }
-
-// 从提示词框移除已有的比例短语（精确匹配整段，避免重复）
+// 从描述框移除已有的比例短语（精确匹配整段，避免重复）
 function stripRatioFromPrompt(){
-  const ta=document.getElementById("prompt");
-  let v=(ta.value||"").trim();
+  const ta = document.getElementById("prompt");
+  let v = (ta.value || "").trim();
   for(const key of Object.keys(RATIO_PROMPTS)){
-    const t=(RATIO_PROMPTS[key]||"").trim();
-    if(t && v.endsWith(t)){ v=v.slice(0, v.length - t.length).trim(); }
+    const t = (RATIO_PROMPTS[key] || "").trim();
+    if(t && v.endsWith(t)){ v = v.slice(0, v.length - t.length).trim(); }
   }
-  ta.value=v;
+  ta.value = v;
 }
-
-// 把当前比例短语写入提示词框（可见、可改）
+// 把当前比例短语写入描述框（可见、可改）
 function applyRatioToPrompt(){
+  if(!document.getElementById("prompt")) return;
   stripRatioFromPrompt();
-  const ta=document.getElementById("prompt");
-  let v=(ta.value||"").trim();
+  const ta = document.getElementById("prompt");
+  let v = (ta.value || "").trim();
   if(selectedRatio && RATIO_PROMPTS[selectedRatio]){
-    const t=RATIO_PROMPTS[selectedRatio];
-    v=(v ? v + "\n\n" + t : t);
+    v = v ? (v + "\n\n" + RATIO_PROMPTS[selectedRatio]) : RATIO_PROMPTS[selectedRatio];
   }
-  ta.value=v;
+  ta.value = v;
 }
 
-// 注：原「Canvas 白边归一化」已移除——改由比例指引注入提示词，模型自然扩展场景，
-// 避免生硬留白与比例失衡（见 RATIO_PROMPTS 与 createTask）。
-
-function renderPresetChips(){
-  const box=document.getElementById("presetGroups"); box.innerHTML="";
-  PRESET_GROUPS.forEach(g=>{
-    const grp=document.createElement("div"); grp.className="preset-group";
-    const title=document.createElement("div"); title.className="pg-title"; title.textContent=g.title; grp.appendChild(title);
-    const row=document.createElement("div"); row.className="chip-row";
-    g.items.forEach(p=>{
-      const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=p.label;
-      b.onclick=()=>fillPreset(p.text, b, p.white);
-      row.appendChild(b);
+/* ---------- 微调修饰器（镜头 / 光影） ---------- */
+function renderModifiers(){
+  [["lensMods", MODIFIERS.lens], ["lightMods", MODIFIERS.light]].forEach(pair=>{
+    const box = document.getElementById(pair[0]); if(!box) return;
+    box.innerHTML = "";
+    (pair[1] || []).forEach(m=>{
+      const b=document.createElement("button"); b.type="button"; b.className="chip";
+      b.textContent = m.label;
+      b.onclick = ()=>toggleModifier(m.text, b);
+      box.appendChild(b);
     });
-    grp.appendChild(row); box.appendChild(grp);
-  });
-  const lm=document.getElementById("lensMods"); lm.innerHTML="";
-  LENS_MODIFIERS.forEach(m=>{
-    const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=m.label;
-    b.onclick=()=>toggleModifier(m.text, b);
-    lm.appendChild(b);
-  });
-  const ltm=document.getElementById("lightMods"); ltm.innerHTML="";
-  LIGHT_MODIFIERS.forEach(m=>{
-    const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=m.label;
-    b.onclick=()=>toggleModifier(m.text, b);
-    ltm.appendChild(b);
   });
 }
+function syncModifierChips(){
+  document.querySelectorAll("#lensMods .chip, #lightMods .chip").forEach(c=>c.classList.remove("active"));
+}
+function toggleModifier(text, btn){
+  const ta = document.getElementById("prompt"); let v = ta.value || "";
+  if(v.includes(text)){
+    v = v.split(text).join("").replace(/,\s*,/g, ",").replace(/^\s*,\s*/, "").replace(/\s*,\s*$/, "").trim();
+    ta.value = v; btn.classList.remove("active"); selectedModifiers.delete(text);
+  } else {
+    ta.value = (v.trim() ? v.trim() : "") + text; btn.classList.add("active"); selectedModifiers.add(text);
+  }
+}
 
+/* ---------- 配置摘要 / 预估 ---------- */
+function currentRpm(){
+  if((selectedModel || "").indexOf("agnes-") === 0){
+    const t = AGNES_RPM[window.AGNES_TIER || "default"];
+    const m = t && t[window.AGNES_SIZE || "1K"];
+    return m ? m[1] : 20;
+  }
+  return 8;   // Gemini：后端全局 3.5s 流控（约 17 RPM），按 8 RPM 保守估算
+}
+function updateSummary(){
+  const box = document.getElementById("summaryBox"); if(!box) return;
+  const m = (window.MODEL_CATALOG || []).find(x => x.id === selectedModel);
+  const fusion = (selectedMode === "multi_angle_fusion");
+  const n = fusion ? (selectedFiles.length ? 1 : 0) : selectedFiles.length;
+  const unit = (m && m.unit_price_usd != null) ? m.unit_price_usd : 0;
+  const rows = [];
+  rows.push(["场景", selectedScene ? (selectedScene.emoji + " " + selectedScene.name) : "未选择", !selectedScene]);
+  rows.push(["模型", m ? shortModelName(m.id) : "-", false]);
+  rows.push(["比例", (RATIO_OPTIONS.find(r=>r.value===selectedRatio) || {}).label || "原图比例", false]);
+  rows.push(["出图", n + " 张" + (fusion ? "（多角度融合为 1 张）" : ""), false]);
+  rows.push(["预估费用", unit > 0 ? "<b>$" + (unit * n).toFixed(4) + "</b>" : "<b>免费</b>", false]);
+  if(n > 0){
+    const rpm = currentRpm();
+    const mins = Math.max(1, Math.ceil(n / rpm));
+    rows.push(["预计耗时", "<b>约 " + mins + " 分钟</b>（" + rpm + " 张/分）", false]);
+  }
+  box.innerHTML = rows.map(r=>
+    '<div class="sum-line' + (r[2] ? " warn" : "") + '"><span>' + r[0] + '</span><span>' + r[1] + '</span></div>'
+  ).join("");
+}
+
+/* ---------- 配置加载 ---------- */
 async function loadConfig(){
   try{
-    const r=await api("GET","/api/config");
-    if(r.ok){ const d=await r.json();
+    const r = await api("GET", "/api/config");
+    if(r.ok){
+      const d = await r.json();
       window.MODEL_CATALOG = d.models || [];
-      const sel=document.getElementById("modelSel");
-      const defaultModel=d.gemini_model;
-      sel.innerHTML="";
-      (window.MODEL_CATALOG).forEach(m=>{
-        const o=document.createElement("option"); o.value=m.id;
-        let txt=m.id;
-        if(m.unit_price_usd!=null) txt+=` · 单价 $${m.unit_price_usd.toFixed(4)}/张`;
-        else txt+=" · 价格未公开";
-        o.textContent=txt; sel.appendChild(o);
-      });
-      if(defaultModel && ![...sel.options].some(o=>o.value===defaultModel)){
-        const o=document.createElement("option"); o.value=defaultModel; o.textContent=defaultModel+"（后台默认）"; sel.appendChild(o);
+      window.THEME_CATALOG = d.themes || [];
+      SCENE_CATEGORIES = d.categories || [];
+      SCENE_LIBRARY = d.scenes || [];
+      MODIFIERS = d.modifiers || { lens: [], light: [] };
+      RATIO_OPTIONS = d.ratios || [];
+      RATIO_PROMPTS = d.ratio_prompts || {};
+      window.AGNES_TIER = d.agnes_user_tier || "default";
+      window.AGNES_SIZE = d.agnes_size_tier || "1K";
+      window.DEFAULT_MODEL = d.default_model || d.gemini_model || "";
+      window.ENABLE_GEMINI = !!d.enable_gemini;      // Gemini 模型是否已由管理员开放
+      window.FREE_LIMIT = d.free_daily_limit || 20;  // 未绑定 Key 每日免费张数
+      window.AGNES_POOL = d.agnes_pool || { valid:0, system:0, user:0 };
+      if(!selectedModel) selectedModel = window.DEFAULT_MODEL || (window.MODEL_CATALOG[0] ? window.MODEL_CATALOG[0].id : "");
+      // 兜底：当前选中了 Gemini 但开关已被管理员关闭 → 切回第一个可用模型
+      const cur=(window.MODEL_CATALOG||[]).find(m=>m.id===selectedModel);
+      if(!window.ENABLE_GEMINI && cur && cur.provider==="gemini"){
+        selectedModel = (window.MODEL_CATALOG[0]||{}).id || "";
+        showToast("管理员已关闭 Gemini 模型，已为你切回 " + shortModelName(selectedModel));
       }
-      sel.value = (defaultModel && [...sel.options].some(o=>o.value===defaultModel)) ? defaultModel : (sel.options[0]?.value||"");
-      if(window._pendingLite && [...sel.options].some(o=>o.value===window._pendingLite)){
-        sel.value = window._pendingLite; updateModelPriceHint(); window._pendingLite=null;
-      }
-      updateModelPriceHint();
+      renderModelCards(); renderRatioChips(); renderModifiers(); renderSceneLibrary();
+      updateModelPriceHint(); updateSummary();
     }
   }catch(e){ /* 配置拉取失败不影响使用，保留默认选项 */ }
 }
 
-function updateModelPriceHint(){
-  const sel=document.getElementById("modelSel");
-  const el=document.getElementById("modelPriceHint");
-  const desc=document.getElementById("modelDesc");
-  if(!el) return;
-  const m=(window.MODEL_CATALOG||[]).find(x=>x.id===sel.value);
-  if(!m){ el.textContent=""; if(desc) desc.innerHTML=""; return; }
-  if(m.unit_price_usd!=null){
-    el.innerHTML=`单价 <b>$${m.unit_price_usd.toFixed(4)}</b> / 张（图生图：含 1 张输入图 + 1 张输出图，约 ¥${m.unit_price_cny.toFixed(3)}）`;
-  } else {
-    el.innerHTML=`该模型官方未公开价格，本次生成不计费。`;
-  }
-  // 模型业务定位 / 适用场景 / 推荐使用时机
-  if(desc){
-    const tag = m.tag ? `<div class="md-tag">${m.tag}</div>` : "";
-    const dsc = m.description ? `<div class="md-desc">${m.description}</div>` : "";
-    desc.innerHTML = tag + dsc;
-  }
-}
-
 async function createTask(){
   const prompt=document.getElementById("prompt").value.trim();
-  if(!prompt) return setMsg("createMsg","请输入场景提示词",true);
-  if(!selectedFiles.length) return setMsg("createMsg","请至少上传一张图片",true);
-  const model=document.getElementById("modelSel").value;
+  if(!selectedScene && !prompt) return setMsg("createMsg","请先选择一个场景，或手动填写场景描述",true);
+  if(!prompt) return setMsg("createMsg","场景描述为空，请重新选择场景或手动填写",true);
+  if(!selectedFiles.length) return setMsg("createMsg","请至少上传一张产品图",true);
+  const model=selectedModel || (window.MODEL_CATALOG && window.MODEL_CATALOG[0] ? window.MODEL_CATALOG[0].id : "");
+  const curM=(window.MODEL_CATALOG||[]).find(x=>x.id===model);
+  if(curM && curM.provider==="gemini" && !window.ENABLE_GEMINI){
+    return setMsg("createMsg","Gemini 模型当前未启用（需管理员在后台「API 配置」开启），请改选 Agnes 模型。",true);
+  }
   const isFusion = (selectedMode==="multi_angle_fusion");
   if(isFusion && !(selectedFiles.length>=2 && selectedFiles.length<=4)){
     return setMsg("createMsg","多角度合成模式需要上传 2~4 张同一产品的不同角度图",true);
   }
   const fd=new FormData(); fd.append("prompt",prompt); fd.append("model",model);
   fd.append("mode", isFusion ? "multi_angle_fusion" : "single");
+  fd.append("ratio", selectedRatio);   // 输出比例（agnes 等支持 ratio 的模型使用；''=原图比例）
+  // 节日/季节主题（鬼节 / 春 / 秋）：非空时后端注入居中构图锁 + 主题氛围层；
+  // theme_random=true 时逐张独立随机组合背景/元素/光影（seed 可复现）。
+  if(selectedTheme){
+    fd.append("theme", selectedTheme);
+    fd.append("theme_random", selectedThemeRandom ? "true" : "false");
+  }
   // 纯白底模式：优先取预设标记，否则按框内文本兜底识别 A 组纯白短语，确保手动改写也生效
   const whiteAuto = /rgb\s*255|pure solid white background|blank white background|#ffffff|white background/i.test(prompt);
   fd.append("is_white_bg", (selectedWhiteBg || whiteAuto) ? "true" : "false");
@@ -1058,9 +1477,11 @@ async function createTask(){
     const d=await res.json();
     setMsg("createMsg", isFusion ? `多角度合成任务已创建：将融合生成 1 张场景图` : `任务已创建：共 ${d.total_count} 张`, false);
     document.getElementById("prompt").value="";
+    resetScene();   // 任务已提交：复位场景 / 主题态，避免下一批误带上次的场景
     selectedFiles.forEach(x=>URL.revokeObjectURL(x.url));
     selectedFiles=[]; document.getElementById("files").value=""; renderThumbs();
     startCurrentTaskPoll(d.id);
+    refreshProfile();   // 刷新今日额度展示（Worker 出图后轮询结束还会再刷新）
   } finally { btn.disabled=false; }
 }
 
@@ -1146,6 +1567,7 @@ async function pollCurrentTask(){
   if(info) info.innerHTML=`${d.completed_count}/${d.total_count} 成功 · ${d.failed_count} 失败` + (d.cost_usd?` · 消耗 <b>$${d.cost_usd.toFixed(4)}</b>`:"");
   if(d.status==="completed" || d.status==="failed"){
     if(currentTaskPoll){ clearInterval(currentTaskPoll); currentTaskPoll=null; }
+    refreshProfile();   // 出图完成 → 更新今日免费额度进度
   }
 }
 
@@ -1185,6 +1607,7 @@ function changeHistPage(delta){ const next=histPage+delta; if(next>=1) loadHisto
 /* ---------- 管理后台 ---------- */
 async function loadAdmin(){
   await loadApiSettings();
+  await loadAdminKeys();
   const s=await api("GET","/api/admin/dashboard/stats"); if(s.status===401){clearToken();return location.reload();}
   if(s.ok){ const d=await s.json();
     let byModel="";
@@ -1275,6 +1698,20 @@ async function exportAdmin(format){
 function exportAdminCsv(){ exportAdmin("csv"); }
 function exportAdminZip(){ exportAdmin("zip"); }
 function escAttr(s){ return (s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function copyPrompt(text){
+  if(!text) return showToast("没有可复制的提示词");
+  const done = ()=>showToast("完整提示词已复制");
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done){
+  const ta=document.createElement("textarea");
+  ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done(); }catch(e){ showToast("复制失败，请手动复制"); }
+  ta.remove();
+}
 
 /* ---------- API 配置 ---------- */
 async function loadApiSettings(){
@@ -1285,27 +1722,76 @@ async function loadApiSettings(){
     document.getElementById("apiBase").value=d.gemini_base_url||"";
     document.getElementById("apiModel").value=d.gemini_model||"";
     document.getElementById("apiKey").value="";
+    const gemChk=document.getElementById("enableGeminiChk");
+    if(gemChk) gemChk.checked = !!d.enable_gemini;
     hint.textContent = d.is_key_set ? `当前已配置 Key：${d.key_masked}（如需更换，粘贴新 Key 后保存；留空表示不修改）` : "尚未配置 Key，请粘贴后保存。";
+    // Agnes
+    document.getElementById("agnesBase").value=d.agnes_base_url||"";
+    document.getElementById("agnesKey").value="";
+    document.getElementById("agnesTier").value=d.agnes_user_tier||"default";
+    document.getElementById("agnesSize").value=d.agnes_size_tier||"1K";
+    updateAgnesRpmHint();
+    const ahint=document.getElementById("agnesKeyHint");
+    ahint.textContent = d.agnes_is_key_set ? `当前已配置 Key：${d.agnes_key_masked}（如需更换，粘贴新 Key 后保存；留空表示不修改）` : "尚未配置 Agnes Key，请粘贴后保存。";
   } else { hint.textContent="读取配置失败。"; }
+}
+
+// 官方 RPM 配额表（与后端 agnes.py RPM_MATRIX 同步），仅用于前端提示。
+const AGNES_RPM = {
+  default:    {"1K":[30,20],"2K":[20,10],"3K":[2,1],"4K":[1,1]},
+  enterprise: {"1K":[60,40],"2K":[40,20],"3K":[2,1],"4K":[2,1]},
+  tokenplan:  {"1K":[120,100],"2K":[120,80],"3K":[2,1],"4K":[2,1]},
+};
+function updateAgnesRpmHint(){
+  const t=document.getElementById("agnesTier").value;
+  const s=document.getElementById("agnesSize").value;
+  const m=AGNES_RPM[t] && AGNES_RPM[t][s];
+  const el=document.getElementById("agnesRpmHint");
+  el.textContent = m ? `当前档位：稳态 ${m[1]} RPM（突发上限 ${m[0]} RPM）。系统已内置令牌桶限速，保证不超过官方配额。`
+                     : "请选择账户档位与分辨率档位。";
 }
 async function saveApiSettings(){
   const key=document.getElementById("apiKey").value.trim();
   const base=document.getElementById("apiBase").value.trim();
   const model=document.getElementById("apiModel").value.trim();
+  const akey=document.getElementById("agnesKey").value.trim();
+  const abase=document.getElementById("agnesBase").value.trim();
   const body={};
   if(key) body.gemini_api_key=key;
   if(base) body.gemini_base_url=base;
   if(model) body.gemini_model=model;
+  if(akey) body.agnes_api_key=akey;
+  if(abase) body.agnes_base_url=abase;
+  body.agnes_user_tier=document.getElementById("agnesTier").value;
+  body.agnes_size_tier=document.getElementById("agnesSize").value;
+  const gemChk=document.getElementById("enableGeminiChk");
+  body.enable_gemini = gemChk ? gemChk.checked : false;
+  updateAgnesRpmHint();
   const status=document.getElementById("apiStatus");
   const r=await api("PUT","/api/admin/settings",{json:body});
   if(r.ok){ const d=await r.json();
     status.textContent="✓ 已保存，立即生效"; status.className="api-status ok";
     document.getElementById("apiKeyHint").textContent=`当前已配置 Key：${d.key_masked}（如需更换，粘贴新 Key 后保存；留空表示不修改）`;
     document.getElementById("apiKey").value="";
+    const astatus=document.getElementById("agnesStatus");
+    astatus.textContent="✓ 已保存，立即生效"; astatus.className="api-status ok";
+    document.getElementById("agnesKeyHint").textContent=`当前已配置 Key：${d.agnes_key_masked}（如需更换，粘贴新 Key 后保存；留空表示不修改）`;
+    document.getElementById("agnesKey").value="";
     showToast("API 配置已保存");
-  } else { const e=await r.json().catch(()=>({})); status.textContent="✗ "+(e.detail||"保存失败"); status.className="api-status err"; }
+    loadConfig();   // Gemini 开关可能变化 → 刷新控制台模型目录与默认模型
+  } else { const e=await r.json().catch(()=>({})); status.textContent="✗ "+(e.detail||"保存失败"); status.className="api-status err"; document.getElementById("agnesStatus").textContent=""; }
 }
-async function testApiSettings(){
+async function testApiSettings(provider){
+  if(provider==="agnes"){
+    const status=document.getElementById("agnesStatus");
+    status.textContent="测试中…"; status.className="api-status";
+    const r=await api("POST","/api/admin/settings/test-agnes");
+    if(r.ok){ const d=await r.json();
+      if(d.ok){ status.textContent=`✓ 连接成功（${d.model_count} 个模型可用）`; status.className="api-status ok"; }
+      else { status.textContent=`✗ ${d.message}（HTTP ${d.status}）`; status.className="api-status err"; }
+    } else { const e=await r.json().catch(()=>({})); status.textContent="✗ "+(e.detail||"请求失败"); status.className="api-status err"; }
+    return;
+  }
   const status=document.getElementById("apiStatus");
   status.textContent="测试中…"; status.className="api-status";
   const r=await api("POST","/api/admin/settings/test");
@@ -1321,6 +1807,200 @@ function closeLightbox(ev){ if(ev.target.id==="lightbox"||ev.target.classList.co
 
 /* ---------- 工具 ---------- */
 function fmt(s){ if(!s) return ""; return new Date(s).toLocaleString("zh-CN"); }
+
+/* ==========================================================================
+   「我的 API Key」+ 免费额度 + 管理后台 Key 池
+   ========================================================================== */
+let myProfile = null;   // GET /api/profile 的结果（含绑定状态 + 今日额度）
+
+async function refreshProfile(){
+  try{
+    const r = await api("GET", "/api/profile");
+    if(r.status === 401){ return; }
+    if(r.ok){ myProfile = await r.json(); renderKeyStatus(); refreshQuotaNote(); }
+  }catch(e){}
+}
+
+/* ---------- 员工端：Key 弹窗 ---------- */
+async function openKeyModal(){
+  const ov = document.getElementById("keyOverlay");
+  if(!ov) return;
+  ov.classList.remove("hidden"); ov.classList.add("show");
+  if(!myProfile) await refreshProfile();
+  renderKeyStatus();
+  const tip = document.getElementById("keyLimitTip");
+  if(tip && myProfile) tip.textContent = myProfile.quota_limit || window.FREE_LIMIT || 20;
+}
+function closeKeyModal(){
+  const ov = document.getElementById("keyOverlay");
+  if(!ov) return;
+  ov.classList.remove("show"); ov.classList.add("hidden");
+}
+function renderKeyStatus(){
+  const el = document.getElementById("keyStatus"); if(!el) return;
+  if(!myProfile){ el.innerHTML = '<div class="modal-tip">加载中…</div>'; return; }
+  const k = myProfile.agnes_key;
+  const used = myProfile.quota_used_today || 0;
+  const limit = myProfile.quota_limit || window.FREE_LIMIT || 20;
+  const delBtn = document.getElementById("myKeyDel");
+  if(k && k.saved){
+    el.innerHTML =
+      '<div style="background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.28);border-radius:12px;padding:12px 14px;font-size:13px;color:#14532d;margin:10px 0;line-height:1.8;">' +
+      '✅ 已绑定有效 Agnes Key：<b>' + escAttr(k.masked) + '</b><br/>' +
+      '状态：<b>有效</b> · 来源：' + (k.source === "system" ? "系统下发" : "本人绑定") +
+      (k.validated_at ? ' · 验证时间：' + fmt(k.validated_at) : "") +
+      '<br/>每日生成额度：<b>不限量</b>（生图优先使用你自己的 Key）</div>';
+    if(delBtn){ delBtn.disabled = false; delBtn.title = "解绑后恢复每日免费额度"; }
+  } else {
+    el.innerHTML =
+      '<div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.28);border-radius:12px;padding:12px 14px;font-size:13px;color:#78350f;margin:10px 0;line-height:1.8;">' +
+      '⚠️ 尚未绑定 Agnes Key<br/>' +
+      '今日已生成 <b>' + used + ' / ' + limit + '</b> 张（未绑定每天免费 ' + limit + ' 张）。<br/>' +
+      '在下框粘贴你的 Agnes API Key 并点「验证并保存」，通过后即可 <b>不限量</b> 使用。' +
+      (window.AGNES_POOL ? '<br/><span style="opacity:.75">当前公司 Key 池：' + (window.AGNES_POOL.valid||0) + ' 个可用</span>' : '') +
+      '</div>';
+    if(delBtn) delBtn.disabled = true;
+  }
+}
+function keyStatusMsg(text, ok){
+  const el = document.getElementById("myKeyStatus");
+  if(!el) return;
+  el.textContent = text;
+  el.className = "api-status " + (ok ? "ok" : "err");
+}
+async function saveMyKey(){
+  const input = document.getElementById("myAgnesKey");
+  const key = (input.value || "").trim();
+  if(!key) return keyStatusMsg("请先粘贴 Agnes API Key", false);
+  const btn = document.getElementById("myKeyBtn");
+  if(btn) btn.disabled = true;
+  keyStatusMsg("验证中…（会产生一次 1×1 极小型免费测试图）", true);
+  try{
+    const r = await api("PUT", "/api/profile/agnes-key", { json: { api_key: key } });
+    if(r.status === 401){ clearToken(); return location.reload(); }
+    const d = await r.json().catch(()=>({}));
+    if(r.ok){
+      myProfile = d;
+      input.value = "";
+      keyStatusMsg("✓ 验证通过并已保存：今日起不限量", true);
+      renderKeyStatus(); refreshQuotaNote();
+      showToast("Agnes Key 验证通过，已解锁不限量额度");
+    } else {
+      keyStatusMsg("✗ " + (d.detail || "保存失败"), false);
+    }
+  }catch(e){
+    keyStatusMsg("✗ 请求失败，请稍后重试", false);
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+async function removeMyKey(){
+  if(!confirm("确认解绑当前 Agnes Key？解绑后恢复每日免费额度（未绑定每天 N 张）。")) return;
+  const r = await api("DELETE", "/api/profile/agnes-key");
+  if(r.status === 401){ clearToken(); return location.reload(); }
+  if(r.ok){
+    myProfile = await r.json();
+    const el = document.getElementById("myKeyStatus");
+    if(el){ el.textContent = "已解绑"; el.className = "api-status ok"; }
+    renderKeyStatus(); refreshQuotaNote();
+    showToast("已解绑：恢复每日免费额度");
+  } else { showToast("解绑失败"); }
+}
+
+/* ---------- 控制台侧栏额度提示 ---------- */
+function refreshQuotaNote(){
+  const el = document.getElementById("quotaNote");
+  if(!el) return;
+  if(!myProfile){ el.className = "quota-note"; el.innerHTML = ""; return; }
+  if(myProfile.quota_unlimited){
+    el.className = "quota-note ok";
+    el.innerHTML = "✅ 已绑定 Agnes Key · 今日生成不限量";
+    return;
+  }
+  el.className = "quota-note warn";
+  el.innerHTML = '🔓 未绑定 Agnes Key：今日免费额度 <b>' +
+    (myProfile.quota_used_today||0) + ' / ' + (myProfile.quota_limit||20) +
+    '</b> 张 <span class="q-act" onclick="openKeyModal()">去绑定解锁不限量 →</span>';
+}
+
+/* ---------- 管理后台：Agnes Key 池 ---------- */
+async function loadAdminKeys(){
+  const stat = document.getElementById("poolStat");
+  if(stat) stat.textContent = "加载中…";
+  const r = await api("GET", "/api/admin/keys");
+  if(r.status === 401){ clearToken(); return location.reload(); }
+  if(!r.ok){ if(stat) stat.textContent = "加载失败"; return; }
+  const rows = await r.json();
+  const tb = document.querySelector("#poolTable tbody");
+  if(!tb) return;
+  const valid = rows.filter(x => x.status === "valid").length;
+  if(stat) stat.textContent = "（可用 " + valid + " 个 / 共 " + rows.length + " 个）";
+  tb.innerHTML = "";
+  if(!rows.length){
+    tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;">池为空：员工在「🔑 API Key」绑定并验证成功后自动进入，或管理员在上方直接添加系统 Key</td></tr>';
+    return;
+  }
+  rows.forEach(k=>{
+    const tr = document.createElement("tr");
+    const owner = k.owner_username
+      ? escAttr(k.owner_username) + (k.source === "user" ? "" : "")
+      : '<span style="color:#64748b;">系统</span>';
+    const st = k.status === "valid"
+      ? '<span class="badge st-completed">有效</span>'
+      : '<span class="badge st-failed">已失效</span>';
+    const note = k.note ? escAttr(k.note.length > 16 ? k.note.slice(0, 16) + "…" : k.note) : "—";
+    tr.innerHTML =
+      '<td class="cell-mono">' + escAttr(k.masked) + '</td>' +
+      '<td>' + owner + '</td>' +
+      '<td>' + (k.source === "system" ? "系统" : "员工绑定") + '</td>' +
+      '<td>' + st + '</td>' +
+      '<td style="font-size:12px;">' + fmt(k.validated_at) + '</td>' +
+      '<td style="font-size:12px;">' + fmt(k.last_used_at) + '</td>' +
+      '<td title="' + escAttr(k.note || "") + '" style="font-size:12px;">' + note + '</td>' +
+      '<td style="white-space:nowrap;">' +
+        '<button class="btn btn-ghost btn-sm" id="poolTest_' + k.id + '" onclick="testPoolKey(' + k.id + ')">测试</button> ' +
+        '<button class="btn btn-danger btn-sm" onclick="delPoolKey(' + k.id + ')">移除</button>' +
+      '</td>';
+    tr.title = "完整 Key 仅后台可见（掩码显示）";
+    tb.appendChild(tr);
+  });
+}
+async function addSysKey(){
+  const input = document.getElementById("newSysKey");
+  const key = (input.value || "").trim();
+  if(!key) return showToast("请先粘贴要加入池的 Agnes Key");
+  const r = await api("POST", "/api/admin/keys", { json: { api_key: key } });
+  if(r.status === 401){ clearToken(); return location.reload(); }
+  const d = await r.json().catch(()=>({}));
+  if(r.ok){
+    input.value = "";
+    showToast("已加入池（来源：系统）。建议点「测试」验证可用性");
+    loadAdminKeys();
+  } else {
+    showToast("加入失败：" + (d.detail || "未知错误"));
+  }
+}
+async function testPoolKey(id){
+  const btn = document.getElementById("poolTest_" + id);
+  if(btn){ btn.disabled = true; btn.textContent = "测试中…"; }
+  const r = await api("POST", "/api/admin/keys/" + id + "/test");
+  const d = await r.json().catch(()=>({}));
+  if(btn){ btn.disabled = false; btn.textContent = "测试"; }
+  if(r.ok){
+    if(d.ok) showToast("✓ Key #" + id + " 可用：" + ((d.message||"").slice(0,60)));
+    else showToast("✗ Key #" + id + " 校验失败" + (d.auth_failed ? "（Key 被服务端拒绝，已标为失效）" : "（可能是限流/网络，未改状态）") + "：" + ((d.message||"").slice(0,80)));
+  } else {
+    showToast("测试请求失败");
+  }
+  loadAdminKeys();
+}
+async function delPoolKey(id){
+  if(!confirm("确认从池中移除该 Key？移除后相关用户将失去不限量额度（若是系统 Key，将不再参与生图）。")) return;
+  const r = await api("DELETE", "/api/admin/keys/" + id);
+  if(r.status === 401){ clearToken(); return location.reload(); }
+  if(r.ok){ showToast("已移除"); loadAdminKeys(); }
+  else { const d = await r.json().catch(()=>({})); showToast("移除失败：" + (d.detail || "")); }
+}
 
 /* 轮询：控制台仅轮询「当前任务」进度，历史列表在「我的历史」页按需加载 */
 let pollTimer=null;

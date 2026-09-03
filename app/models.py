@@ -50,6 +50,9 @@ class GenerationTask(SQLModel, table=True):
     env: Optional[str] = None    # 室内/室外环境分类（indoor|outdoor|None），生成时追加对应环境提示词
     is_white_bg: bool = Field(default=False)  # 纯白底模式：后端据此切换 Layer2/Layer4，避免多余杂色背景
     mode: Optional[str] = None   # 生成模式：None/"single" 单图批量；"multi_angle_fusion" 多角度合成
+    ratio: Optional[str] = None  # 输出比例（agnes 等支持 ratio 参数的模型使用，如 4:3 / 16:9；空=原图比例）
+    theme: Optional[str] = None  # 节日/季节主题：ghost|spring|autumn|None；非空时注入居中构图锁与主题氛围层
+    theme_random: bool = Field(default=False)  # True=逐张随机组合背景/元素/光影（seed 可复现）；False=沿用框内所见即所得文本
     total_count: int = 0
     completed_count: int = 0
     failed_count: int = 0
@@ -77,6 +80,41 @@ class TaskItem(SQLModel, table=True):
 
 
 # --------------------------------------------------------------------------- #
+# API keys pool (user-bound validated Agnes keys + system keys)
+# --------------------------------------------------------------------------- #
+class ApiKey(SQLModel, table=True):
+    """One entry in the shared generation-key pool.
+
+    ``source``:
+      * ``user``   - staff self-registered a validated Agnes key (owner_user_id set)
+      * ``system`` - admin-provided key (owner_user_id usually NULL); seeded from
+                     data/settings.json or added from the admin key-pool card
+    ``status``:
+      * ``valid``   - usable for generation (user keys only enter as valid after
+                      a live probe succeeded)
+      * ``invalid`` - probe failed / generation returned 401-403; excluded from pool
+    The raw key is stored like the legacy data/settings.json convention
+    (plaintext, git-ignored runtime volume). API responses only ever expose the
+    masked form.
+    """
+
+    __tablename__ = "api_keys"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    provider: str = Field(default="agnes", index=True)
+    owner_user_id: Optional[int] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+    source: str = Field(default="user")  # user | system
+    key_value: str = Field(unique=True, index=True)
+    status: str = Field(default="valid")  # valid | invalid
+    note: Optional[str] = None
+    created_at: datetime = Field(default_factory=_utcnow)
+    validated_at: Optional[datetime] = None
+    last_used_at: Optional[datetime] = None
+
+
+# --------------------------------------------------------------------------- #
 # API schemas
 # --------------------------------------------------------------------------- #
 class RegisterRequest(SQLModel):
@@ -97,6 +135,59 @@ class UserRead(SQLModel):
     total_images_generated: int
     total_cost_usd: float = 0.0
     created_at: datetime
+
+
+# ---- my profile / personal Agnes key binding + quota ----
+class ProfileKeyInfo(SQLModel):
+    """Masked view of the caller's own pool key (never the raw value)."""
+
+    saved: bool = False
+    masked: str = ""
+    status: str = ""
+    source: str = ""
+    note: Optional[str] = None
+    validated_at: Optional[datetime] = None
+
+
+class MyProfile(SQLModel):
+    id: int
+    username: str
+    role: str
+    agnes_key: Optional[ProfileKeyInfo] = None
+    quota_unlimited: bool = False  # 管理员或已绑定有效 Agnes Key → 不限量
+    quota_used_today: int = 0      # 今日已成功生成的图片数
+    quota_limit: int = 0           # 未绑定时每日上限（free_daily_limit）
+
+
+class ProfileKeyUpdate(SQLModel):
+    api_key: str
+
+
+# ---- admin key-pool views ----
+class PoolKeyOut(SQLModel):
+    id: int
+    provider: str
+    owner_username: Optional[str] = None  # None = 系统 Key
+    source: str
+    masked: str
+    status: str
+    note: Optional[str] = None
+    created_at: datetime
+    validated_at: Optional[datetime] = None
+    last_used_at: Optional[datetime] = None
+
+
+class PoolKeyAddBody(SQLModel):
+    api_key: str
+    note: Optional[str] = None
+
+
+class PoolTestResult(SQLModel):
+    ok: bool
+    status: int
+    message: str
+    auth_failed: bool = False   # True = 服务端明确拒绝（401/403）
+
 
 
 class ItemOut(SQLModel):
@@ -216,6 +307,14 @@ class AdminSettings(SQLModel):
     key_masked: str
     gemini_base_url: str
     gemini_model: str
+    # Gemini 模型全局开关：默认 False=对员工隐藏/禁用 Gemini，True=开放。
+    enable_gemini: bool = False
+    # Agnes AI（图生图，独立 Key / 节点）
+    agnes_is_key_set: bool = False
+    agnes_key_masked: str = ""
+    agnes_base_url: str = ""
+    agnes_size_tier: str = "1K"      # 1K / 2K / 3K / 4K
+    agnes_user_tier: str = "default" # default / enterprise / tokenplan
 
 
 class AdminSettingsUpdate(SQLModel):
@@ -224,6 +323,11 @@ class AdminSettingsUpdate(SQLModel):
     gemini_api_key: Optional[str] = None
     gemini_base_url: Optional[str] = None
     gemini_model: Optional[str] = None
+    enable_gemini: Optional[bool] = None
+    agnes_api_key: Optional[str] = None
+    agnes_base_url: Optional[str] = None
+    agnes_size_tier: Optional[str] = None
+    agnes_user_tier: Optional[str] = None
 
 
 class ApiTestResult(SQLModel):

@@ -32,6 +32,15 @@ _defaults = {
     "gemini_api_key": settings.gemini_api_key,
     "gemini_base_url": settings.gemini_base_url,
     "gemini_model": settings.gemini_model,
+    "enable_gemini": bool(settings.enable_gemini),
+    "agnes_api_key": settings.agnes_api_key,
+    "agnes_base_url": settings.agnes_base_url,
+    "agnes_size_tier": settings.agnes_size_tier,
+    "agnes_user_tier": settings.agnes_user_tier,
+    # 额外的系统级 Agnes Key（数组），由管理员直接编辑 data/settings.json
+    # 追加；应用启动与后台保存配置时会同步进 api_keys 池。
+    "agnes_extra_keys": [],
+    "free_daily_limit": int(settings.free_daily_limit),
 }
 
 
@@ -72,6 +81,49 @@ def get_model() -> str:
         return _load().get("gemini_model", settings.gemini_model)
 
 
+def get_enable_gemini() -> bool:
+    with _lock:
+        v = _load().get("enable_gemini", bool(settings.enable_gemini))
+    if isinstance(v, str):
+        return v.strip().lower() in ("1", "true", "yes", "on")
+    return bool(v)
+
+
+def get_agnes_extra_keys() -> list:
+    with _lock:
+        extra = _load().get("agnes_extra_keys", []) or []
+    return [str(k).strip() for k in extra if str(k).strip()]
+
+
+def get_free_daily_limit() -> int:
+    with _lock:
+        v = _load().get("free_daily_limit", settings.free_daily_limit)
+    try:
+        return max(1, int(v))
+    except (TypeError, ValueError):
+        return settings.free_daily_limit
+
+
+def get_agnes_key() -> str:
+    with _lock:
+        return _load().get("agnes_api_key", "") or ""
+
+
+def get_agnes_base_url() -> str:
+    with _lock:
+        return _load().get("agnes_base_url", settings.agnes_base_url)
+
+
+def get_agnes_size_tier() -> str:
+    with _lock:
+        return (_load().get("agnes_size_tier", settings.agnes_size_tier) or "1K").strip() or "1K"
+
+
+def get_agnes_user_tier() -> str:
+    with _lock:
+        return (_load().get("agnes_user_tier", settings.agnes_user_tier) or "default").strip() or "default"
+
+
 def mask_key(key: str) -> str:
     """Mask all but the last 4 characters for safe display."""
     if not key:
@@ -86,11 +138,19 @@ def get_public() -> dict:
     with _lock:
         data = _load()
     key = data.get("gemini_api_key", "") or ""
+    agnes_key = data.get("agnes_api_key", "") or ""
     return {
         "is_key_set": bool(key),
         "key_masked": mask_key(key),
         "gemini_base_url": data.get("gemini_base_url", settings.gemini_base_url),
         "gemini_model": data.get("gemini_model", settings.gemini_model),
+        "enable_gemini": bool(get_enable_gemini()),
+        "agnes_is_key_set": bool(agnes_key),
+        "agnes_key_masked": mask_key(agnes_key),
+        "agnes_base_url": data.get("agnes_base_url", settings.agnes_base_url),
+        "agnes_size_tier": data.get("agnes_size_tier", settings.agnes_size_tier),
+        "agnes_user_tier": data.get("agnes_user_tier", settings.agnes_user_tier),
+        "free_daily_limit": data.get("free_daily_limit", settings.free_daily_limit),
     }
 
 
@@ -98,6 +158,12 @@ def update(
     api_key: str | None = None,
     gemini_base_url: str | None = None,
     gemini_model: str | None = None,
+    enable_gemini: bool | None = None,
+    agnes_api_key: str | None = None,
+    agnes_base_url: str | None = None,
+    agnes_size_tier: str | None = None,
+    agnes_user_tier: str | None = None,
+    agnes_extra_keys: list | None = None,
 ) -> dict:
     """Persist admin-provided overrides. Empty strings are ignored so the
     caller can send a partial update (e.g. only change the model)."""
@@ -109,5 +175,18 @@ def update(
             data["gemini_base_url"] = gemini_base_url.strip().rstrip("/")
         if gemini_model is not None and gemini_model.strip():
             data["gemini_model"] = gemini_model.strip()
+        if enable_gemini is not None:
+            data["enable_gemini"] = bool(enable_gemini)
+        if agnes_api_key is not None and agnes_api_key.strip():
+            data["agnes_api_key"] = agnes_api_key.strip()
+        if agnes_base_url is not None and agnes_base_url.strip():
+            data["agnes_base_url"] = agnes_base_url.strip().rstrip("/")
+        if agnes_size_tier is not None and agnes_size_tier.strip():
+            data["agnes_size_tier"] = agnes_size_tier.strip().upper()
+        if agnes_user_tier is not None and agnes_user_tier.strip():
+            data["agnes_user_tier"] = agnes_user_tier.strip().lower()
+        if agnes_extra_keys is not None:
+            clean = [str(k).strip() for k in agnes_extra_keys if str(k).strip()]
+            data["agnes_extra_keys"] = clean
         _save(data)
         return get_public()

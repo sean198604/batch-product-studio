@@ -18,10 +18,14 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import worker
+from app import pool as keypool
+from app import settings_store
 from app.config import settings
 from app.db import get_session
 from app.deps import get_current_user, require_admin
+from app.pricing import get_price
 from app.prompts import assemble_prompt
+from app.scenes import is_valid_theme
 from app.models import (
     GenerationTask,
     HistoryTask,
@@ -162,13 +166,52 @@ async def create_task(
     env: str = Form(None, description="环境分类 indoor|outdoor|None，生成时追加对应环境提示词"),
     is_white_bg: bool = Form(False, description="纯白底模式：切换 Layer2/Layer4，避免多余杂色背景"),
     mode: str = Form(None, description="生成模式：single 单图批量 / multi_angle_fusion 多角度合成"),
+    ratio: str = Form(None, description="输出比例（agnes 等支持 ratio 的模型使用，如 4:3 / 16:9；空=原图比例）"),
+    theme: str = Form(None, description="节日/季节主题：ghost|spring|autumn；非空时注入居中构图锁与主题氛围层"),
+    theme_random: bool = Form(False, description="主题随机变体：True=逐张随机组合背景/元素/光影（seed 可复现）"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> TaskSummary:
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
+    # ---- Gemini 门禁：默认隐藏，管理员开启后才能使用 ----
+    chosen_model = (model or "").strip() or settings_store.get_model() or ""
+    price = get_price(chosen_model)
+    if (
+        price is not None
+        and price.provider == "gemini"
+        and not settings_store.get_enable_gemini()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Gemini 模型当前未启用（管理员在后台「API 配置」开启后才可使用）。请改用 Agnes 模型。",
+        )
+
+    # ---- 每日免费额度预检（未绑定有效 Agnes Key 的员工）----
+    # 权威判定仍在 worker 内：预检只用于尽早提示，避免排队后才失败。
     is_fusion = (mode == "multi_angle_fusion")
+    if user.role != "admin":
+        own_key = await keypool.own_valid_key(session, user.id)
+        if own_key is None:
+            limit = settings_store.get_free_daily_limit()
+            used = await keypool.used_today(session, user.id)
+            will_generate = 1 if is_fusion else len(files)
+            if used + will_generate > limit:
+                remain = max(0, limit - used)
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"今日免费额度已用完（{limit} 张/天，已用 {used} 张）。"
+                        + (
+                            f"本次需 {will_generate} 张，还差 {will_generate - remain} 张。"
+                            if remain < will_generate and remain > 0
+                            else ""
+                        )
+                        + "请在右上角「🔑 API Key」绑定自己的 Agnes Key 解锁不限量，或明日 0 点后再试。"
+                    ),
+                )
+
     if is_fusion and not (2 <= len(files) <= 4):
         raise HTTPException(
             status_code=400,
@@ -178,18 +221,27 @@ async def create_task(
     if env not in (None, "indoor", "outdoor"):
         env = None
 
+    # 主题（鬼节 / 春 / 秋）：非法值直接忽略，退化为普通场景，不影响主流程。
+    theme = (theme or "").strip() or None
+    if theme and not is_valid_theme(theme):
+        theme = None
+
     # 后端在创建任务时即把用户填写的场景提示词拼装为四层结构
     # （保真锁 + 物理防畸变 + 用户场景 + 商业画质），result 存入 full_prompt，
     # 既作为实际生图用的提示词，也用于记录展示与一键复制。
     # white_bg 模式由前端显式传入（选了 A 组纯白预设即 true），否则按文本兜底识别。
     # 多角度合成模式使用专用 Layer1（多参考图理解 3D 结构并融合成单张场景）。
-    full_prompt = assemble_prompt(prompt, white_bg=is_white_bg, multi_angle=is_fusion)
+    # 选定主题时额外注入「居中构图锁 + 主题氛围约束」层（位于 Layer2 之后）。
+    full_prompt = assemble_prompt(
+        prompt, white_bg=is_white_bg, multi_angle=is_fusion, theme=theme
+    )
 
     task = GenerationTask(
         user_id=user.id, prompt=prompt, full_prompt=full_prompt,
         total_count=1 if is_fusion else len(files),
         model=model or None, env=env, is_white_bg=bool(is_white_bg),
         mode="multi_angle_fusion" if is_fusion else None,
+        ratio=ratio or None, theme=theme, theme_random=bool(theme_random),
     )
     session.add(task)
     await session.flush()  # populate task.id (UUID)
