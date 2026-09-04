@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     max_retries: int = 3                    # 429/5xx retries
     retry_backoff_seconds: str = "5,10,20"  # comma-separated backoff schedule
 
+    # ---------- Multi-task parallel pool ----------
+    # 调度器同时最多并行处理的任务数（每个任务内仍串行处理自己的图片）。
+    # 超过该数的任务按提交顺序进入后退队列（strict FIFO）。
+    # 调整后必须重启服务；运行时改这个值不会立刻生效。
+    max_concurrent_tasks: int = 4
+
+    # ---------- Registration gate (invitation code) ----------
+    # 注册用户累计 ≥ 该阈值后，新注册必须提供管理员签发的注册码。
+    # 默认 20 用户门槛，留作扩容缓冲。设为 0 即立刻强制启用注册码。
+    registration_open_user_threshold: int = 20
+
     # ---------- JWT ----------
     jwt_secret_key: str = "change-me-to-a-long-random-string"
     jwt_algorithm: str = "HS256"

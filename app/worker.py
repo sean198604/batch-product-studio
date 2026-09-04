@@ -1,21 +1,27 @@
-"""Background queue + worker + global rate limiting (DB-backed).
+"""Background queue: multi-task parallel pool + strict-FIFO back-wait queue.
 
 Design
-------
-* A single :class:`asyncio.Queue` holds work units = ``item_id`` (UUID string).
-* ONE worker coroutine drains the queue sequentially -> never more than one
-  in-flight Gemini call (satisfies Semaphore(1)).
-* After *every successful* generation we ``asyncio.sleep(3.5s)`` to keep the
-  real request rate well under the Free Tier ~10 RPM cap.
+-------
+* Up to ``settings.max_concurrent_tasks`` tasks run in parallel; each task
+  still processes its images **sequentially** (one in-flight Gemini call at a
+  time) so the per-task rate-limit pacing (``request_interval_seconds``) is
+  preserved and we never exceed the Free Tier ~10 RPM cap.
+* Tasks beyond the parallel cap go to a strict-FIFO waiting queue and are
+  promoted to active the moment a slot frees up. New tasks always jump to the
+  back of the line — no "submission order within an active slot" wishful
+  thinking.
+* Per-task item queues are kept in-memory; the DB is the source of truth on
+  recovery.
 * On HTTP 429 / 5xx / network errors the Gemini client retries with
   5/10/20s backoff; if exhausted the single image is marked ``failed`` and the
   next image is processed (a failure never blocks the queue).
-* After each success we atomically bump the owning User's
-  ``total_api_calls`` and ``total_images_generated`` inside the same commit.
-* ``_task_order`` records the FIFO submission order of tasks that still have
-  pending items, powering the "前置任务尚在执行中" hint on the frontend.
-* On startup ``recover_pending`` re-enqueues any items left in
-  pending/processing from a previous run (DB is the source of truth).
+* After each success we ``asyncio.sleep(request_interval_seconds)`` to keep the
+  real request rate well under the Free Tier ~10 RPM cap, then atomically bump
+  the owning User's ``total_api_calls`` / ``total_images_generated`` /
+  ``total_cost_usd`` inside the same commit.
+* ``recover_pending`` re-enqueues any items left in pending/processing from a
+  previous run through the new dispatcher; the DB record is the source of
+  truth so restart does not lose work.
 """
 from __future__ import annotations
 
@@ -25,6 +31,7 @@ import logging
 import os
 import random
 import tempfile
+from collections import OrderedDict, deque
 from typing import List, Optional
 
 from sqlalchemy import select
@@ -42,17 +49,32 @@ from app import pricing
 
 logger = logging.getLogger("worker")
 
-# ---- runtime globals (populated in start_worker) ----
-_queue: Optional[asyncio.Queue] = None
-_semaphore: Optional[asyncio.Semaphore] = None
+# --------------------------------------------------------------------------- #
+# Runtime state
+# --------------------------------------------------------------------------- #
+# Active task slots (FIFO, capacity = ``_max_concurrent``). Each entry is a
+# task_id and we O(1)-pop oldest when promoting a waiter.
+_active_task_ids: "OrderedDict[str, None]" = OrderedDict()
+# Back-wait queue (strict FIFO; popped from the left when a slot frees).
+_waiting_task_ids: "deque[str]" = deque()
+# Per-task FIFO of item_ids waiting to be processed in-memory.
+_item_queues: "dict[str, deque[str]]" = {}
+# The task_id currently being processed by an **individual** worker slot.
+# (Used by ``queue_info_for`` to render "正在处理您的任务…".)
+_current_task: Optional[str] = None
+
+# Worker handles (created in ``start_worker``).
+_worker_tasks: List[asyncio.Task] = []
+# Wake-up signal: workers sleep here when there's no immediate work.
+_wakeup: Optional[asyncio.Event] = None
+
+# Clients (initialised in ``start_worker``).
 _client: Optional[GeminiClient] = None
 _agnes_client: Optional[AgnesClient] = None
-_task: Optional[asyncio.Task] = None
+_semaphore: Optional[asyncio.Semaphore] = None  # global single in-flight channel
 
-# FIFO order of task_ids that still have pending items.
-_task_order: List[str] = []
-# The task_id currently being processed (None when idle).
-_current_task: Optional[str] = None
+# Cached at start_worker to avoid re-reading settings.
+_max_concurrent: int = 1
 
 
 def _abs(path_relative: str) -> str:
@@ -123,31 +145,45 @@ def _build_prompt(task, multi: bool) -> str:
 
 
 async def start_worker() -> None:
-    global _queue, _semaphore, _client, _agnes_client, _task
-    _queue = asyncio.Queue()
-    _semaphore = asyncio.Semaphore(settings.semaphore_concurrency)
+    """Bootstrap the parallel-pool worker fan-out."""
+    global _wakeup, _client, _agnes_client, _semaphore, _max_concurrent
+    _wakeup = asyncio.Event()
     _client = GeminiClient()
     _agnes_client = AgnesClient()
+    _semaphore = asyncio.Semaphore(settings.semaphore_concurrency)
+    _max_concurrent = max(1, int(settings.max_concurrent_tasks))
+
     await recover_pending()
-    _task = asyncio.create_task(_run(), name="gemini-worker")
-    logger.info("Background worker started (concurrency=%d, interval=%.1fs).",
-                settings.semaphore_concurrency, settings.request_interval_seconds)
+
+    for i in range(_max_concurrent):
+        w = asyncio.create_task(_worker_loop(i), name=f"gemini-worker-{i}")
+        _worker_tasks.append(w)
+
+    logger.info(
+        "Background pool started (parallel_tasks=%d, interval=%.1fs).",
+        _max_concurrent, settings.request_interval_seconds,
+    )
 
 
 async def stop_worker() -> None:
-    global _task
-    if _task is not None:
-        _task.cancel()
+    """Cancel all worker tasks on shutdown (idempotent)."""
+    global _worker_tasks
+    for t in _worker_tasks:
+        t.cancel()
+    for t in _worker_tasks:
         try:
-            await _task
-        except asyncio.CancelledError:
+            await t
+        except (asyncio.CancelledError, Exception):
             pass
-        _task = None
+    _worker_tasks = []
 
 
 async def recover_pending() -> None:
-    """Re-enqueue DB items left pending/processing (e.g. after a restart)."""
-    _task_order.clear()
+    """Re-enqueue DB items left pending/processing (e.g. after a restart).
+
+    Honours the parallel cap exactly like :func:`enqueue_task`: tasks beyond
+    the cap land in the waiting queue and get promoted when slots free up.
+    """
     async with async_session_maker() as session:
         tasks = (
             await session.execute(
@@ -158,7 +194,6 @@ async def recover_pending() -> None:
         ).scalars().all()
 
         for task in tasks:
-            _task_order.append(task.id)
             items = (
                 await session.execute(
                     select(models.TaskItem)
@@ -169,46 +204,125 @@ async def recover_pending() -> None:
                     .order_by(models.TaskItem.created_at)
                 )
             ).scalars().all()
+            item_ids: List[str] = []
             for item in items:
                 item.status = "pending"  # reset interrupted "processing"
-                await _queue.put(item.id)
-            # Recompute counts in case some items were already done.
+                item_ids.append(item.id)
             await _recompute_task_counts(session, task)
+            if item_ids:
+                _accept_task(task.id, item_ids)
         await session.commit()
-    logger.info("Recovered %d pending task(s) into the queue.", len(_task_order))
+    logger.info(
+        "Recovered %d pending task(s) (active=%d, waiting=%d).",
+        len(_active_task_ids) + len(_waiting_task_ids),
+        len(_active_task_ids),
+        len(_waiting_task_ids),
+    )
 
 
 def enqueue_task(task_id: str, item_ids: List[str]) -> None:
-    """Register a task in FIFO order and push its items onto the queue."""
-    if task_id not in _task_order:
-        _task_order.append(task_id)
-    for iid in item_ids:
-        _queue.put_nowait(iid)
+    """Register a task in FIFO order and push its items through the dispatcher."""
+    if not item_ids:
+        return
+    _accept_task(task_id, list(item_ids))
+    if _wakeup is not None:
+        _wakeup.set()
+
+
+def _accept_task(task_id: str, item_ids: List[str]) -> None:
+    """Place a task's items in memory and assign to active slot or waiter queue.
+
+    Idempotent against being called multiple times for the same task (e.g.
+    recover_pending touches tasks that may have been enqueued live too).
+    """
+    existing = _item_queues.get(task_id)
+    if existing is None:
+        _item_queues[task_id] = deque(item_ids)
+    else:
+        existing.extend(item_ids)
+    # If already active or waiting, no need to re-queue.
+    if task_id in _active_task_ids or task_id in _waiting_task_ids:
+        return
+    if len(_active_task_ids) < _max_concurrent:
+        _active_task_ids[task_id] = None  # take a slot
+    else:
+        _waiting_task_ids.append(task_id)
 
 
 def queue_info_for(task_id: str) -> tuple[int, bool]:
-    """Return (tasks_ahead, is_currently_processing) for a given task."""
-    ahead = 0
-    for tid in _task_order:
+    """Return (tasks_ahead, is_currently_processing) for a given task.
+
+    * ``tasks_ahead``  - tasks strictly ahead of this one in the global FIFO
+      order (active slots first, then waiting queue). Mirrors the old
+      behaviour so the "前置任务尚在执行中" frontend hint keeps working.
+    * ``is_currently_processing`` - True iff this task is the one a worker
+      picked up this moment.
+    """
+    for pos, tid in enumerate(_active_task_ids.keys()):
         if tid == task_id:
-            break
-        ahead += 1
-    return ahead, _current_task == task_id
+            return pos, (_current_task == task_id)
+    for pos, tid in enumerate(_waiting_task_ids):
+        if tid == task_id:
+            return len(_active_task_ids) + pos, False
+    # Task is neither active nor waiting (finished, recovered later, etc.).
+    return 0, False
 
 
-async def _run() -> None:
-    assert _queue is not None
+def _has_immediate_work() -> bool:
+    """True iff at least one active task still has pending in-memory items."""
+    for tid in _active_task_ids:
+        q = _item_queues.get(tid)
+        if q and len(q):
+            return True
+    return False
+
+
+def _pick_next_item() -> Optional[tuple[str, str]]:
+    """Return ``(task_id, item_id)`` of the next item to process, else None.
+
+    Walks the active set in FIFO order, returning the first task whose
+    in-memory queue is non-empty. Single ``pop`` removes the item from the
+    queue but the task stays in ``_active_task_ids`` until it is finalised
+    (see :func:`_cleanup_order`).
+
+    Empty deques are treated as "no work" so we never call ``popleft()`` on
+    an empty queue (which would raise ``IndexError``).
+    """
+    for tid in list(_active_task_ids.keys()):
+        q = _item_queues.get(tid)
+        if q and len(q):
+            return tid, q.popleft()
+    return None
+
+
+async def _worker_loop(worker_id: int) -> None:
+    """One worker coroutine. Sleeps on ``_wakeup`` when idle."""
+    assert _wakeup is not None
     while True:
         try:
-            item_id = await _queue.get()
+            await _wakeup.wait()
         except asyncio.CancelledError:
-            break
-        try:
-            await _process(item_id)
-        except Exception:  # never let the worker die on one bad item
-            logger.exception("Unexpected error processing item %s", item_id)
-        finally:
-            _queue.task_done()
+            return
+        while True:
+            picked = _pick_next_item()
+            if picked is None:
+                # Reset wakeup so a *subsequent* task arrival re-fires us.
+                _wakeup.clear()
+                if _has_immediate_work():
+                    # Race: another worker may have set it; ensure set.
+                    _wakeup.set()
+                    continue
+                break
+            tid, item_id = picked
+            try:
+                await _process(item_id)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "worker-%d: unexpected error processing item %s (task %s)",
+                    worker_id, item_id, tid,
+                )
 
 
 async def _process(item_id: str) -> None:
@@ -366,7 +480,7 @@ async def _process(item_id: str) -> None:
             _current_task = None
             _update_task_status(task)
             await session.commit()
-            # Only drop the task from the FIFO order once it is fully done.
+            # Only drop the task from the active set once it is fully done.
             if task.status in ("completed", "failed"):
                 _cleanup_order(task.id)
 
@@ -394,6 +508,39 @@ async def _recompute_task_counts(session, task: models.GenerationTask) -> None:
 
 
 def _cleanup_order(task_id: str) -> None:
-    """Drop a finished task from the FIFO order (idempotent)."""
-    if task_id in _task_order:
-        _task_order.remove(task_id)
+    """Drop a finished task from the in-memory active set and promote a waiter.
+
+    Safe to call repeatedly: each cleanup is idempotent.
+
+    After the active slot frees, we promote the longest-waiting task from
+    ``_waiting_task_ids``. If the waiter queue is empty we simply leave the
+    slot vacant — the next :func:`_accept_task` will fill it.
+    """
+    was_active = task_id in _active_task_ids
+    _active_task_ids.pop(task_id, None)
+    _item_queues.pop(task_id, None)
+    if not was_active:
+        return
+    # Promote FIFO head of waiting into the freed active slot.
+    while _waiting_task_ids and len(_active_task_ids) < _max_concurrent:
+        nxt = _waiting_task_ids.popleft()
+        # If the promoted waiter happens to have no items (e.g. it was a
+        # recovered task whose items all turned out to already be done), skip
+        # it. We loop instead of breaking so we may still promote a later
+        # waiter that *does* have work.
+        if _item_queues.get(nxt) and len(_item_queues[nxt]):
+            _active_task_ids[nxt] = None
+            if _wakeup is not None:
+                _wakeup.set()
+            break
+        _item_queues.pop(nxt, None)
+
+
+def pool_snapshot() -> dict:
+    """Diagnostic snapshot of the parallel pool (for admin / debug)."""
+    return {
+        "max_concurrent": _max_concurrent,
+        "active_task_ids": list(_active_task_ids.keys()),
+        "waiting_task_ids": list(_waiting_task_ids),
+        "current_task": _current_task,
+    }

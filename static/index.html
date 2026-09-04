@@ -680,7 +680,8 @@
           <div id="regForm" class="hidden">
             <div class="form-row"><span>用户名（3-32 位）</span><input type="text" id="regUser" placeholder="用户名" /></div>
             <div class="form-row"><span>密码（至少 6 位）</span><input type="password" id="regPass" placeholder="密码" /></div>
-            <p class="modal-tip">首位注册的员工将自动成为管理员。注册后默认每天可免费生成 20 张场景图；登录后在右上角「🔑 API Key」绑定自己的 Agnes Key 可解锁不限量。</p>
+            <div class="form-row hidden" id="regCodeWrap"><span>注册邀请码<span style="color:#ef4444;">*</span></span><input type="text" id="regCode" placeholder="向管理员索要 12 位邀请码" autocomplete="off" maxlength="32" /></div>
+            <p class="modal-tip" id="regTip">首位注册的员工将自动成为管理员。注册后默认每天可免费生成 20 张场景图；登录后在右上角「🔑 API Key」绑定自己的 Agnes Key 可解锁不限量。</p>
             <div style="margin-top:14px;"><button class="btn btn-primary" style="width:100%;" onclick="doRegister()">注册</button></div>
           </div>
           <div class="modal-tip" id="authMsg" style="margin-top:12px;min-height:14px;"></div>
@@ -927,6 +928,21 @@
           </div>
 
           <div class="glass-card">
+            <div class="card-title">注册邀请码 <span class="api-status" id="regCodeStat" style="font-weight:600;"></span></div>
+            <div class="card-sub">累计注册 <b id="regCodeCount">-</b> / <b id="regCodeThreshold">-</b> 人，达到阈值后新员工必须凭 12 位邀请码才能注册。在此处创建邀请码并复制给新员工，单次默认 1 人使用，可设置过期时间。</div>
+            <div class="form-row" style="margin:12px 0 10px; gap:8px; flex-wrap:wrap;">
+              <input type="number" id="newCodeMaxUses" class="glass-input" style="flex:0 0 110px;" min="1" value="1" title="该码允许通过的注册次数" placeholder="次数"/>
+              <input type="datetime-local" id="newCodeExpires" class="glass-input" style="flex:0 0 220px;" title="过期时间（可选，留空=永不过期）"/>
+              <input type="text" id="newCodeNote" class="glass-input" style="flex:1;" placeholder="备注（如「销售部 6 月用」，可选）" maxlength="64"/>
+              <button class="btn btn-primary btn-sm" onclick="createRegCode()">生成邀请码</button>
+              <button class="btn btn-ghost btn-sm" onclick="loadAdminRegCodes()">刷新</button>
+            </div>
+            <div class="table-wrap">
+              <table id="regCodeTable"><thead><tr><th>邀请码</th><th>状态</th><th>已用/上限</th><th>过期</th><th>签发人</th><th>备注</th><th>签发时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+
+          <div class="glass-card">
             <div class="card-title">Agnes Key 池 <span class="api-status" id="poolStat" style="font-weight:600;"></span></div>
             <div class="card-sub">员工在右上角「🔑 API Key」绑定且<b>验证成功</b>的 Agnes Key 会自动计入此池（显示归属用户名）；管理员可在此直接添加「系统 Key」。生图时按「自有 Key → 系统 Key → 池内轮换」取用；<b>未绑定 Key 的员工每天最多免费生成 20 张</b>，绑定后不限量。</div>
             <div class="form-row" style="margin:12px 0 10px; gap:8px;">
@@ -1004,6 +1020,8 @@ let currentTaskPoll = null;
 let histPage = 1;
 let admPage = 1;
 let admImgPage = 1;
+let regMode = null;        // /api/auth/registration-mode 的最新缓存
+let regCodesCache = [];    // 管理后台的注册码列表缓存（避免重复 fetch）
 
 function getToken(){ return localStorage.getItem(TOKEN_KEY); }
 function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
@@ -1028,13 +1046,41 @@ function switchTab(which){
   document.getElementById("tabReg").classList.toggle("active", which==="reg");
   document.getElementById("loginForm").classList.toggle("hidden", which!=="login");
   document.getElementById("regForm").classList.toggle("hidden", which!=="reg");
+  if(which==="reg") loadRegistrationMode();
+}
+
+async function loadRegistrationMode(){
+  try {
+    const res = await fetch("/api/auth/registration-mode");
+    if(!res.ok) return;
+    regMode = await res.json();
+  } catch(e) {
+    regMode = null;
+    return;
+  }
+  const wrap = document.getElementById("regCodeWrap");
+  const tip = document.getElementById("regTip");
+  if(!wrap || !tip) return;
+  if(regMode && regMode.code_required){
+    wrap.classList.remove("hidden");
+    document.getElementById("regCode").required = true;
+    tip.innerHTML = `当前已注册 <b>${regMode.current_count}</b> 人（≥ ${regMode.threshold} 后必须凭邀请码注册）。请向管理员索要 12 位邀请码后再注册。`;
+  } else {
+    wrap.classList.add("hidden");
+    document.getElementById("regCode").required = false;
+    tip.innerHTML = `首位注册的员工将自动成为管理员。注册后默认每天可免费生成 20 张场景图；登录后在右上角「🔑 API Key」绑定自己的 Agnes Key 可解锁不限量。`;
+  }
 }
 
 async function doRegister(){
   const username=document.getElementById("regUser").value.trim();
   const password=document.getElementById("regPass").value;
+  const codeWrap=document.getElementById("regCodeWrap");
+  const codeInput=document.getElementById("regCode");
+  const regCode = (!codeWrap.classList.contains("hidden") ? codeInput.value.trim() : "");
   if(!username||!password) return showAuthMsg("请输入用户名和密码", true);
-  const res=await fetch("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});
+  if(codeInput.required && !regCode) return showAuthMsg("请输入注册邀请码", true);
+  const res=await fetch("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password,registration_code:regCode})});
   if(res.ok){ showAuthMsg("注册成功，请登录", false); switchTab("login"); }
   else { const e=await res.json().catch(()=>({})); showAuthMsg(e.detail||"注册失败", true); }
 }
@@ -1710,6 +1756,7 @@ function changeHistPage(delta){ const next=histPage+delta; if(next>=1) loadHisto
 async function loadAdmin(){
   await loadApiSettings();
   await loadAdminKeys();
+  await loadAdminRegCodes();
   const s=await api("GET","/api/admin/dashboard/stats"); if(s.status===401){clearToken();return location.reload();}
   if(s.ok){ const d=await s.json();
     let byModel="";
@@ -2102,6 +2149,107 @@ async function delPoolKey(id){
   if(r.status === 401){ clearToken(); return location.reload(); }
   if(r.ok){ showToast("已移除"); loadAdminKeys(); }
   else { const d = await r.json().catch(()=>({})); showToast("移除失败：" + (d.detail || "")); }
+}
+
+/* ---------- 管理后台：注册邀请码 ---------- */
+async function loadAdminRegCodes(){
+  // 拉阈值与累计人数（提示文案 + 角标用）。
+  try {
+    const m = await api("GET", "/api/auth/registration-mode");
+    if(m.ok){
+      const d = await m.json();
+      document.getElementById("regCodeCount").textContent = d.current_count;
+      document.getElementById("regCodeThreshold").textContent = d.threshold;
+      document.getElementById("regCodeStat").textContent =
+        d.code_required ? "🔒 已启用邀请码" : "✅ 当前开放注册";
+    }
+  } catch(e) {}
+  // 拉注册码列表。
+  const r = await api("GET", "/api/admin/registration-codes");
+  if(r.status === 401){ clearToken(); return location.reload(); }
+  if(!r.ok){ const d = await r.json().catch(()=>({})); showToast("加载邀请码失败：" + (d.detail || "")); return; }
+  const rows = await r.json();
+  regCodesCache = rows;
+  const tb = document.querySelector("#regCodeTable tbody"); tb.innerHTML = "";
+  if(!rows.length){
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="8" style="text-align:center;color:#94a3b8;padding:18px;">尚无邀请码，点击「生成邀请码」创建第一个。</td>';
+    tb.appendChild(tr);
+    return;
+  }
+  rows.forEach(x => {
+    const tr = document.createElement("tr");
+    const expires = x.expires_at ? fmt(x.expires_at) : "永久";
+    const statusBadge = x.status === "active"
+      ? (x.remaining > 0 ? '<span style="color:#16a34a;">生效中</span>' : '<span style="color:#64748b;">已用完</span>')
+      : '<span style="color:#ef4444;">已停用</span>';
+    const codeEsc = (x.code || "").replace(/[<>&"']/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"})[c]);
+    tr.innerHTML = `
+      <td><code style="background:#f1f5f9;padding:4px 8px;border-radius:6px;font-weight:600;letter-spacing:1px;">${codeEsc}</code>
+        <button class="btn btn-ghost btn-sm" style="margin-left:4px;padding:2px 8px;" onclick="copyRegCode('${codeEsc}')" title="复制邀请码">📋</button>
+      </td>
+      <td>${statusBadge}</td>
+      <td>${x.used_count} / ${x.max_uses}</td>
+      <td style="font-size:12px;">${expires}</td>
+      <td>${x.created_by || "-"}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(x.note||'').replace(/[<>&"']/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"})[c])}">${x.note || ""}</td>
+      <td style="font-size:12px;">${fmt(x.created_at)}</td>
+      <td><button class="btn btn-ghost btn-sm" style="color:#ef4444;" onclick="delRegCode(${x.id})">删除</button></td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+function copyRegCode(code){
+  try {
+    navigator.clipboard.writeText(code).then(
+      () => showToast("已复制邀请码：" + code),
+      () => fallbackCopy(code)
+    );
+  } catch(e) { fallbackCopy(code); }
+}
+function fallbackCopy(text){
+  const t = document.createElement("textarea");
+  t.value = text; document.body.appendChild(t);
+  t.select(); document.execCommand("copy");
+  document.body.removeChild(t);
+  showToast("已复制邀请码：" + text);
+}
+
+async function createRegCode(){
+  const maxUses = parseInt(document.getElementById("newCodeMaxUses").value || "1", 10);
+  const expRaw = document.getElementById("newCodeExpires").value;
+  const note = document.getElementById("newCodeNote").value.trim();
+  if(!(maxUses >= 1)) return showToast("次数必须 ≥ 1");
+  let expires_at = null;
+  if(expRaw){
+    // datetime-local 没有时区，按本地时间解释后转 ISO。
+    const d = new Date(expRaw);
+    if(isNaN(d.getTime())) return showToast("过期时间格式错误");
+    expires_at = d.toISOString();
+  }
+  const r = await api("POST", "/api/admin/registration-codes", {
+    json: { max_uses: maxUses, expires_at, note: note || null }
+  });
+  if(r.status === 401){ clearToken(); return location.reload(); }
+  if(r.ok){
+    const d = await r.json();
+    showToast("已生成：" + d.code);
+    document.getElementById("newCodeNote").value = "";
+    document.getElementById("newCodeExpires").value = "";
+    loadAdminRegCodes();
+  } else {
+    const d = await r.json().catch(()=>({}));
+    showToast("生成失败：" + (d.detail || ""));
+  }
+}
+
+async function delRegCode(id){
+  if(!confirm("确认删除该邀请码？已用完次数的码删掉不影响历史注册。")) return;
+  const r = await api("DELETE", "/api/admin/registration-codes/" + id);
+  if(r.status === 401){ clearToken(); return location.reload(); }
+  if(r.ok){ showToast("已删除"); loadAdminRegCodes(); }
+  else { const d = await r.json().catch(()=>({})); showToast("删除失败：" + (d.detail || "")); }
 }
 
 /* 轮询：控制台仅轮询「当前任务」进度，历史列表在「我的历史」页按需加载 */
