@@ -5,6 +5,8 @@ import csv
 import io
 import json
 import os
+import secrets
+import string
 import zipfile
 from datetime import datetime
 
@@ -33,6 +35,9 @@ from app.models import (
     PoolKeyAddBody,
     PoolKeyOut,
     PoolTestResult,
+    RegistrationCode,
+    RegistrationCodeCreate,
+    RegistrationCodeOut,
     TaskSummary,
     TaskItem,
     User,
@@ -41,6 +46,132 @@ from app.models import (
 from app.settings_store import get_public, update as update_settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# --------------------------------------------------------------------------- #
+# Registration codes (invitation codes)
+# --------------------------------------------------------------------------- #
+def _generate_registration_code(length: int = 12) -> str:
+    """Return a unique, unambiguous-looking invite code.
+
+    Uses uppercase letters + digits excluding ``0/O/1/I/L`` to keep manual
+    transcription possible without ambiguity. A 12-character code has
+    ~31^12 ≈ 8e17 combinations; combined with the uniqueness constraint on
+    the table, collisions are practically impossible.
+    """
+    alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # omit 0/O/1/I/L
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _registration_code_out(row: RegistrationCode) -> RegistrationCodeOut:
+    remaining = max(0, (row.max_uses or 0) - (row.used_count or 0))
+    return RegistrationCodeOut(
+        id=row.id,
+        code=row.code,
+        max_uses=row.max_uses,
+        used_count=row.used_count,
+        remaining=remaining,
+        status=row.status,
+        expires_at=row.expires_at,
+        created_by=row.created_by,
+        note=row.note,
+        created_at=row.created_at,
+        last_used_at=row.last_used_at,
+    )
+
+
+@router.post("/registration-codes", response_model=RegistrationCodeOut, status_code=201)
+async def create_registration_code(
+    body: RegistrationCodeCreate,
+    admin_user: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> RegistrationCodeOut:
+    """Issue a new invitation code (admin only).
+
+    * ``max_uses`` defaults to 1; set higher for group / department issuance.
+    * ``expires_at`` is optional; ``None`` means never expires.
+    * ``note`` is free-form text for the admin's own tracking.
+    * The generated code is unique against the table; if a collision ever
+      happens (astronomically unlikely), we retry up to 5 times.
+    """
+    max_uses = int(body.max_uses or 1)
+    if max_uses < 1:
+        raise HTTPException(status_code=400, detail="max_uses 必须 ≥ 1。")
+    if body.expires_at is not None and body.expires_at <= datetime.now(tz=body.expires_at.tzinfo):
+        raise HTTPException(status_code=400, detail="expires_at 必须是未来时间。")
+
+    row: RegistrationCode | None = None
+    last_err: Exception | None = None
+    for _ in range(5):
+        candidate_code = _generate_registration_code()
+        existing = (
+            await session.execute(
+                select(RegistrationCode).where(
+                    RegistrationCode.code == candidate_code
+                )
+            )
+        ).scalars().first()
+        if existing is not None:
+            last_err = RuntimeError("code collision")
+            continue
+        row = RegistrationCode(
+            code=candidate_code,
+            max_uses=max_uses,
+            used_count=0,
+            status="active",
+            expires_at=body.expires_at,
+            created_by=admin_user.username,
+            note=(body.note or "").strip() or None,
+        )
+        session.add(row)
+        try:
+            await session.commit()
+        except Exception as exc:
+            last_err = exc
+            await session.rollback()
+            row = None
+            continue
+        break
+    if row is None:
+        raise HTTPException(
+            status_code=500,
+            detail=f"生成注册码失败：{last_err}",
+        )
+    await session.refresh(row)
+    return _registration_code_out(row)
+
+
+@router.get("/registration-codes", response_model=list[RegistrationCodeOut])
+async def list_registration_codes(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[RegistrationCodeOut]:
+    """All issued invitation codes (including fully-used / expired)."""
+    rows = (
+        await session.execute(
+            select(RegistrationCode).order_by(desc(RegistrationCode.created_at))
+        )
+    ).scalars().all()
+    return [_registration_code_out(r) for r in rows]
+
+
+@router.delete("/registration-codes/{code_id}")
+async def delete_registration_code(
+    code_id: int,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Hard-delete an invitation code. Codes with ``used_count > 0`` are still
+    safe to delete — past registrations remain valid, only future ones are
+    blocked. This is intentionally permissive so admins can clean up typos /
+    test codes.
+    """
+    row = await session.get(RegistrationCode, code_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="注册码不存在。")
+    await session.delete(row)
+    await session.commit()
+    return {"ok": True, "deleted_code_id": code_id}
 
 
 def _item_urls(item: TaskItem) -> tuple[list[str], str | None]:

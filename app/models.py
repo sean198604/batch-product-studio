@@ -79,6 +79,34 @@ class TaskItem(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
 
 
+class RegistrationCode(SQLModel, table=True):
+    """管理员签发的注册邀请码（仅在用户数达阈值后启用）。
+
+    * ``code``       - 12 位大写字母 + 数字（管理员 UI 展示）
+    * ``max_uses``   - 允许通过此码成功注册的次数（默认 1）
+    * ``used_count`` - 已通过此码成功注册的次数
+    * ``expires_at`` - 过期时间；NULL = 永久有效
+    * ``created_by`` - 创建该码的管理员用户名（仅做记录，无外键约束）
+    * ``note``       - 备注（如「销售部 6 月用」）
+
+    通过校验的条件：存在 + status='active' + used_count < max_uses +
+    (expires_at IS NULL OR expires_at > now())。
+    """
+
+    __tablename__ = "registration_codes"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(unique=True, index=True)
+    max_uses: int = Field(default=1)
+    used_count: int = Field(default=0)
+    status: str = Field(default="active")  # active | disabled
+    expires_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    note: Optional[str] = None
+    created_at: datetime = Field(default_factory=_utcnow)
+    last_used_at: Optional[datetime] = None
+
+
 # --------------------------------------------------------------------------- #
 # API keys pool (user-bound validated Agnes keys + system keys)
 # --------------------------------------------------------------------------- #
@@ -120,6 +148,8 @@ class ApiKey(SQLModel, table=True):
 class RegisterRequest(SQLModel):
     username: str
     password: str
+    # 用户数达阈值后由后端强制校验；不满阈值时，前端即使传空后端也忽略。
+    registration_code: Optional[str] = None
 
 
 class TokenResponse(SQLModel):
@@ -336,4 +366,39 @@ class ApiTestResult(SQLModel):
     message: str
     model_available: bool = False
     model_count: int = 0
+
+
+# --------------------------------------------------------------------------- #
+# Registration codes (admin-issued invitation codes)
+# --------------------------------------------------------------------------- #
+class RegistrationCodeCreate(SQLModel):
+    """管理员创建注册码的入参。"""
+
+    max_uses: int = 1               # 允许通过的注册次数（>=1）
+    expires_at: Optional[datetime] = None  # NULL = 永不过期
+    note: Optional[str] = None
+
+
+class RegistrationCodeOut(SQLModel):
+    """注册码展示（含真实 code，管理员可见）。"""
+
+    id: int
+    code: str
+    max_uses: int
+    used_count: int
+    remaining: int                   # max_uses - used_count
+    status: str                      # active | disabled
+    expires_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    note: Optional[str] = None
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+
+
+class RegistrationMode(SQLModel):
+    """前端注册页用：根据当前用户数判断是否需要邀请码。"""
+
+    code_required: bool
+    current_count: int
+    threshold: int
 
