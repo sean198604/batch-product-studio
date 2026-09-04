@@ -212,6 +212,7 @@ async def put_settings(
         agnes_base_url=body.agnes_base_url,
         agnes_size_tier=body.agnes_size_tier,
         agnes_user_tier=body.agnes_user_tier,
+        agnes_default_model=body.agnes_default_model,
     )
     # 配置（agnes_api_key / agnes_extra_keys）变化后同步进 Key 池。
     await keypool.sync_system_keys_from_settings()

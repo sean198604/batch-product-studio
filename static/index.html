@@ -52,7 +52,7 @@
     }
 
     /* ====================================================================
-       2. 顶栏 Top Bar（64px 固定毛玻璃栏：品牌居左 · 功能菜单绝对居中 · 用户区居右）
+       2. 顶栏 Top Bar（64px 固定毛玻璃栏：品牌居左 · 功能菜单靠左跟随品牌 · 用户区居右）
        ==================================================================== */
     .top-bar {
       position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
@@ -67,12 +67,8 @@
     }
     .top-bar > .brand { z-index: 1; }
     .top-bar > .top-right { margin-left: auto; z-index: 1; }
-    /* 行内功能菜单：绝对居中，不参与 flex 流，登录后显隐不影响品牌/用户区对齐 */
-    #navTabs {
-      position: absolute; left: 50%; top: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 1;
-    }
+    /* 行内功能菜单：品牌右侧（flex 流内）。登录后显隐不影响品牌/用户区对齐：
+       top-right 用 margin-left:auto 钉在最右，navTabs 插入品牌与用户区之间。 */
     .brand { display: flex; align-items: center; gap: 11px; }
     .brand-logo {
       width: 38px; height: 38px; border-radius: 11px;
@@ -111,7 +107,7 @@
        ==================================================================== */
     #navTabs {
       position: relative; display: flex; align-items: center; gap: 2px;
-      padding: 5px; justify-self: center;
+      padding: 5px; margin-left: 30px;   /* 紧贴品牌右侧，菜单整体靠左 */
     }
     .nav-slider {
       position: absolute; top: 5px; bottom: 5px; left: 0; width: 90px; border-radius: 11px;
@@ -636,6 +632,94 @@
     #adminImgTable .cell-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid rgba(15,23,42,.12); background: #f1f5f9; }
     #adminImgTable .cell-thumb:hover { box-shadow: 0 0 0 2px #4f6ef7; }
     #adminImgTable .cell-prompt { max-width: 220px; }
+
+    /* ====================================================================
+       管理后台：左侧分组导航 + 右侧内容面板
+       ==================================================================== */
+    .admin-layout { display: flex; align-items: flex-start; gap: 18px; }
+    .admin-side {
+      flex: 0 0 196px; position: sticky; top: calc(var(--header-h) + 18px);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .adm-group {
+      background: var(--glass-bg); backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border: 1px solid var(--glass-border); border-radius: 16px;
+      padding: 7px; box-shadow: var(--glass-shadow);
+    }
+    .adm-group-title {
+      font-size: 10.5px; font-weight: 800; letter-spacing: 1.2px;
+      text-transform: uppercase; color: var(--text-muted);
+      padding: 3px 10px 6px;
+    }
+    .adm-nav-item {
+      appearance: none; border: 0; background: transparent; cursor: pointer;
+      font-family: inherit; width: 100%; text-align: left;
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 11px; border-radius: 11px;
+      color: #475569; font-size: 13px; font-weight: 600;
+      transition: background .2s var(--spring), color .2s var(--spring), box-shadow .2s var(--spring);
+    }
+    .adm-nav-item .adm-ico { font-size: 14px; line-height: 1; opacity: .85; }
+    .adm-nav-item:hover { background: rgba(79, 110, 247, 0.09); color: var(--primary); }
+    .adm-nav-item.active {
+      background: linear-gradient(135deg, #4f6ef7, #6f86fa); color: #fff;
+      box-shadow: 0 6px 14px rgba(79, 110, 247, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .adm-nav-item.active .adm-ico { opacity: 1; }
+    .admin-main { flex: 1; min-width: 0; }
+    .adm-pane .glass-card { margin-bottom: 0; }
+
+    /* 卡片标题内「（图生图 · XX 节点）」高亮标签 */
+    .card-title .title-tag {
+      font-style: normal; font-weight: 800; font-size: 11px; letter-spacing: .4px;
+      vertical-align: 1px; color: #3d5be5; white-space: nowrap;
+      background: rgba(79, 110, 247, 0.10);
+      border: 1px solid rgba(79, 110, 247, 0.22);
+      border-radius: 999px; padding: 1px 9px; margin-left: 2px;
+    }
+    /* 管理后台表单里的 select 与输入控件统一玻璃风格 */
+    .field select {
+      width: 100%; padding: 10px 12px; border-radius: 12px;
+      font-size: 13.5px; font-family: inherit; color: #0f172a;
+      border: 1px solid rgba(226, 232, 240, 0.9); background: rgba(255, 255, 255, 0.9);
+      cursor: pointer; transition: border-color .2s var(--spring), box-shadow .2s var(--spring);
+    }
+    .field select:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(79, 110, 247, 0.14);
+    }
+    /* 注册邀请码：紧凑工具栏 + 邀请码 chip */
+    .adm-tool { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 12px; }
+    .adm-tool .glass-input { width: auto; padding: 6px 12px; font-size: 13px; border-radius: 10px; }
+    #regCodeTable th, #regCodeTable td { padding: 8px 10px; font-size: 12.5px; }
+    .invcode {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: ui-monospace, Consolas, "Courier New", monospace;
+      font-size: 12px; font-weight: 700; letter-spacing: 2px;
+      color: #3d5be5; background: rgba(79, 110, 247, 0.08);
+      border: 1px solid rgba(79, 110, 247, 0.18);
+      border-radius: 8px; padding: 3px 10px; white-space: nowrap; cursor: pointer;
+      transition: all .18s var(--spring);
+    }
+    .invcode:hover { background: rgba(79, 110, 247, 0.16); border-color: rgba(79, 110, 247, 0.4); }
+    .invcode .ic-copy { font-size: 10px; font-weight: 800; color: var(--primary); font-family: inherit; letter-spacing: 0; }
+    .st-mini { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .st-mini::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .st-mini.green { color: #16a34a; } .st-mini.gray { color: #94a3b8; } .st-mini.red { color: #ef4444; }
+
+    /* 管理后台窄屏：左栏变横向滚动胶囊 */
+    @media (max-width: 1080px) {
+      .admin-layout { flex-direction: column; }
+      .admin-side {
+        position: static; flex: none; width: 100%;
+        flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .adm-group { flex: 0 0 auto; display: flex; align-items: center; gap: 3px; padding: 6px; }
+      .adm-group-title { padding: 0 8px 0 4px; }
+      .adm-nav-item { width: auto; padding: 7px 10px; white-space: nowrap; }
+    }
     .field-inline { font-size: 13px; color: #475569; display: inline-flex; align-items: center; gap: 6px; }
     .field-inline select { padding: 6px 8px; border-radius: 9px; border: 1px solid rgba(15,23,42,.15); background: #fff; font-size: 13px; }
   </style>
@@ -857,145 +941,206 @@
         <div id="tabAdmin" class="hidden anim-view">
           <div class="view-head">
             <div class="view-title">管理后台</div>
-            <div class="view-sub">全公司用量统计、员工列表与任务治理。</div>
+            <div class="view-sub">左侧分组导航：API 配置（Gemini / Agnes / Key 池）· 后台数据（统计 / 员工 / 任务 / 图片记录）· 注册邀请。</div>
           </div>
-          <div class="glass-card">
-            <div class="card-title">API 配置</div>
-            <div class="card-sub">在此粘贴 Gemini API Key 与接口地址，保存后立即生效（无需重启）。</div>
-            <div class="form-grid">
-              <label class="field">
-                <span class="field-label">Gemini API Key</span>
-                <input type="password" id="apiKey" placeholder="粘贴你的 Google AI Studio API Key" autocomplete="off"/>
-              </label>
-              <label class="field">
-                <span class="field-label">API 地址（Base URL）</span>
-                <input type="text" id="apiBase" placeholder="https://generativelanguage.googleapis.com/v1beta/models"/>
-              </label>
-              <label class="field">
-                <span class="field-label">生图模型</span>
-                <input type="text" id="apiModel" placeholder="gemini-2.5-flash-image"/>
-              </label>
-            </div>
-            <label class="field-inline" style="margin:12px 0 2px; gap:8px; cursor:pointer;">
-              <input type="checkbox" id="enableGeminiChk" style="width:16px;height:16px;accent-color:#4f6ef7;cursor:pointer;"/>
-              <span><b>启用 Gemini 模型</b>（默认关闭：员工端不可见也不可使用 Gemini；开启后务必先配置上方 Gemini Key，保存立即生效）</span>
-            </label>
-            <div class="api-actions">
-              <button class="btn btn-primary btn-sm" onclick="saveApiSettings()">保存配置</button>
-              <button class="btn btn-ghost btn-sm" onclick="testApiSettings()">测试连接</button>
-              <span class="api-status" id="apiStatus"></span>
-            </div>
-            <p class="modal-tip" id="apiKeyHint"></p>
-          </div>
+          <div class="admin-layout">
+            <!-- ========== 左侧分组导航 ========== -->
+            <aside class="admin-side">
+              <div class="adm-group">
+                <div class="adm-group-title">Api</div>
+                <button class="adm-nav-item" data-pane="gemini" onclick="showAdminPane('gemini')"><span class="adm-ico">🌐</span>Gemini 配置</button>
+                <button class="adm-nav-item" data-pane="agnes" onclick="showAdminPane('agnes')"><span class="adm-ico">🇨🇳</span>Agnes AI 配置</button>
+                <button class="adm-nav-item" data-pane="pool" onclick="showAdminPane('pool')"><span class="adm-ico">🗝️</span>Agnes Key 池</button>
+              </div>
+              <div class="adm-group">
+                <div class="adm-group-title">后台数据</div>
+                <button class="adm-nav-item active" data-pane="stats" onclick="showAdminPane('stats')"><span class="adm-ico">📊</span>统计看板</button>
+                <button class="adm-nav-item" data-pane="users" onclick="showAdminPane('users')"><span class="adm-ico">👥</span>员工列表</button>
+                <button class="adm-nav-item" data-pane="tasks" onclick="showAdminPane('tasks')"><span class="adm-ico">🗂️</span>全公司任务</button>
+                <button class="adm-nav-item" data-pane="images" onclick="showAdminPane('images')"><span class="adm-ico">🖼️</span>全公司图片记录</button>
+              </div>
+              <div class="adm-group">
+                <div class="adm-group-title">注册邀请</div>
+                <button class="adm-nav-item" data-pane="regcodes" onclick="showAdminPane('regcodes')"><span class="adm-ico">🎟️</span>注册邀请码</button>
+              </div>
+            </aside>
 
-          <div class="glass-card">
-            <div class="card-title">Agnes AI 配置（图生图 · 国内节点）</div>
-            <div class="card-sub">粘贴 Agnes AI API Key 与国内节点地址，保存后立即生效（无需重启）。当前官方免费。模型已在「生图模型」下拉中可选（agnes-image-2.1-flash / 2.5-flash）。下方档位决定 RPM 限速，系统已内置令牌桶按官方配额精确限速，不会超限。</div>
-            <div class="form-grid">
-              <label class="field">
-                <span class="field-label">Agnes API Key</span>
-                <input type="password" id="agnesKey" placeholder="粘贴你的 Agnes AI API Key" autocomplete="off"/>
-              </label>
-              <label class="field">
-                <span class="field-label">Agnes 节点（Base URL）</span>
-                <input type="text" id="agnesBase" placeholder="https://apihub.agnes-ai.cn/v1"/>
-              </label>
-              <label class="field">
-                <span class="field-label">账户档位（RPM 配额）</span>
-                <select id="agnesTier" onchange="updateAgnesRpmHint()">
-                  <option value="default">默认 Default（1K=20 / 2K=10 / 3K·4K=1 RPM）</option>
-                  <option value="enterprise">企业版 Enterprise（1K=40 / 2K=20 / 3K·4K=1 RPM）</option>
-                  <option value="tokenplan">Token Plan（1K=100 / 2K=80 / 3K·4K=1 RPM）</option>
-                </select>
-              </label>
-              <label class="field">
-                <span class="field-label">分辨率档位（出图尺寸）</span>
-                <select id="agnesSize" onchange="updateAgnesRpmHint()">
-                  <option value="1K">1K（最快，RPM 最高）</option>
-                  <option value="2K">2K</option>
-                  <option value="3K">3K（每分钟仅约 1 张）</option>
-                  <option value="4K">4K（每分钟仅约 1 张）</option>
-                </select>
-              </label>
-            </div>
-            <p class="modal-tip" id="agnesRpmHint"></p>
-            <div class="api-actions">
-              <button class="btn btn-primary btn-sm" onclick="saveApiSettings()">保存配置</button>
-              <button class="btn btn-ghost btn-sm" onclick="testApiSettings('agnes')">测试连接</button>
-              <span class="api-status" id="agnesStatus"></span>
-            </div>
-            <p class="modal-tip" id="agnesKeyHint"></p>
-          </div>
+            <!-- ========== 右侧内容区 ========== -->
+            <div class="admin-main">
+              <!-- Gemini 配置（国外节点） -->
+              <section class="adm-pane hidden" data-pane="gemini">
+                <div class="glass-card">
+                  <div class="card-title">Gemini 配置（<em class="title-tag">图生图 · 国外节点</em>）</div>
+                  <div class="card-sub">在此粘贴 Google AI Studio（Gemini，国外节点）API Key 与接口地址，保存后立即生效（无需重启）。</div>
+                  <div class="form-grid">
+                    <label class="field">
+                      <span class="field-label">Gemini API Key</span>
+                      <input type="password" id="apiKey" placeholder="粘贴你的 Google AI Studio API Key" autocomplete="off"/>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">API 地址（Base URL）</span>
+                      <input type="text" id="apiBase" placeholder="https://generativelanguage.googleapis.com/v1beta/models"/>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">生图模型</span>
+                      <input type="text" id="apiModel" placeholder="gemini-2.5-flash-image"/>
+                    </label>
+                  </div>
+                  <label class="field-inline" style="margin:12px 0 2px; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="enableGeminiChk" style="width:16px;height:16px;accent-color:#4f6ef7;cursor:pointer;"/>
+                    <span><b>启用 Gemini 模型</b>（默认关闭：员工端不可见也不可使用 Gemini；开启后务必先配置上方 Gemini Key，保存立即生效）</span>
+                  </label>
+                  <div class="api-actions">
+                    <button class="btn btn-primary btn-sm" onclick="saveApiSettings()">保存配置</button>
+                    <button class="btn btn-ghost btn-sm" onclick="testApiSettings()">测试连接</button>
+                    <span class="api-status" id="apiStatus"></span>
+                  </div>
+                  <p class="modal-tip" id="apiKeyHint"></p>
+                </div>
+              </section>
 
-          <div class="glass-card">
-            <div class="card-title">注册邀请码 <span class="api-status" id="regCodeStat" style="font-weight:600;"></span></div>
-            <div class="card-sub">累计注册 <b id="regCodeCount">-</b> / <b id="regCodeThreshold">-</b> 人，达到阈值后新员工必须凭 12 位邀请码才能注册。在此处创建邀请码并复制给新员工，单次默认 1 人使用，可设置过期时间。</div>
-            <div class="form-row" style="margin:12px 0 10px; gap:8px; flex-wrap:wrap;">
-              <input type="number" id="newCodeMaxUses" class="glass-input" style="flex:0 0 110px;" min="1" value="1" title="该码允许通过的注册次数" placeholder="次数"/>
-              <input type="datetime-local" id="newCodeExpires" class="glass-input" style="flex:0 0 220px;" title="过期时间（可选，留空=永不过期）"/>
-              <input type="text" id="newCodeNote" class="glass-input" style="flex:1;" placeholder="备注（如「销售部 6 月用」，可选）" maxlength="64"/>
-              <button class="btn btn-primary btn-sm" onclick="createRegCode()">生成邀请码</button>
-              <button class="btn btn-ghost btn-sm" onclick="loadAdminRegCodes()">刷新</button>
-            </div>
-            <div class="table-wrap">
-              <table id="regCodeTable"><thead><tr><th>邀请码</th><th>状态</th><th>已用/上限</th><th>过期</th><th>签发人</th><th>备注</th><th>签发时间</th><th>操作</th></tr></thead><tbody></tbody></table>
-            </div>
-          </div>
+              <!-- Agnes AI 配置（国内节点） -->
+              <section class="adm-pane hidden" data-pane="agnes">
+                <div class="glass-card">
+                  <div class="card-title">Agnes AI 配置（<em class="title-tag">图生图 · 国内节点</em>）</div>
+                  <div class="card-sub">粘贴 Agnes AI API Key 与国内节点地址，保存后立即生效（无需重启）。当前官方免费。下方档位决定 RPM 限速，系统已内置令牌桶按官方配额精确限速，不会超限。</div>
+                  <div class="form-grid">
+                    <label class="field">
+                      <span class="field-label">Agnes API Key</span>
+                      <input type="password" id="agnesKey" placeholder="粘贴你的 Agnes AI API Key" autocomplete="off"/>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Agnes 节点（Base URL）</span>
+                      <input type="text" id="agnesBase" placeholder="https://apihub.agnes-ai.cn/v1"/>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">默认模型（生成控制台默认选中）</span>
+                      <select id="agnesDefModel">
+                        <option value="">不指定（跟随当前默认）</option>
+                        <option value="agnes-image-2.5-flash">agnes-image-2.5-flash（旗舰 · 推荐）</option>
+                        <option value="agnes-image-2.1-flash">agnes-image-2.1-flash</option>
+                        <option value="agnes-image-2.0-flash">agnes-image-2.0-flash</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">账户档位（RPM 配额）</span>
+                      <select id="agnesTier" onchange="updateAgnesRpmHint()">
+                        <option value="default">默认 Default（1K=20 / 2K=10 / 3K·4K=1 RPM）</option>
+                        <option value="enterprise">企业版 Enterprise（1K=40 / 2K=20 / 3K·4K=1 RPM）</option>
+                        <option value="tokenplan">Token Plan（1K=100 / 2K=80 / 3K·4K=1 RPM）</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">分辨率档位（出图尺寸）</span>
+                      <select id="agnesSize" onchange="updateAgnesRpmHint()">
+                        <option value="1K">1K（最快，RPM 最高）</option>
+                        <option value="2K">2K</option>
+                        <option value="3K">3K（每分钟仅约 1 张）</option>
+                        <option value="4K">4K（每分钟仅约 1 张）</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p class="modal-tip" id="agnesRpmHint"></p>
+                  <div class="api-actions">
+                    <button class="btn btn-primary btn-sm" onclick="saveApiSettings()">保存配置</button>
+                    <button class="btn btn-ghost btn-sm" onclick="testApiSettings('agnes')">测试连接</button>
+                    <span class="api-status" id="agnesStatus"></span>
+                  </div>
+                  <p class="modal-tip" id="agnesKeyHint"></p>
+                </div>
+              </section>
 
-          <div class="glass-card">
-            <div class="card-title">Agnes Key 池 <span class="api-status" id="poolStat" style="font-weight:600;"></span></div>
-            <div class="card-sub">员工在右上角「🔑 API Key」绑定且<b>验证成功</b>的 Agnes Key 会自动计入此池（显示归属用户名）；管理员可在此直接添加「系统 Key」。生图时按「自有 Key → 系统 Key → 池内轮换」取用；<b>未绑定 Key 的员工每天最多免费生成 20 张</b>，绑定后不限量。</div>
-            <div class="form-row" style="margin:12px 0 10px; gap:8px;">
-              <input type="password" id="newSysKey" class="glass-input" style="flex:1;" placeholder="粘贴要加入池的系统 Agnes Key（sk-…），入池后可在下方「测试」验证" autocomplete="off"/>
-              <button class="btn btn-primary btn-sm" onclick="addSysKey()">加入池</button>
-              <button class="btn btn-ghost btn-sm" onclick="loadAdminKeys()">刷新</button>
-            </div>
-            <div class="table-wrap">
-              <table id="poolTable"><thead><tr><th>掩码 Key</th><th>归属</th><th>来源</th><th>状态</th><th>验证时间</th><th>最近使用</th><th>备注</th><th>操作</th></tr></thead><tbody></tbody></table>
-            </div>
-          </div>
+              <!-- 注册邀请码 -->
+              <section class="adm-pane hidden" data-pane="regcodes">
+                <div class="glass-card">
+                  <div class="card-title">注册邀请码 <span class="api-status" id="regCodeStat" style="font-weight:600;margin-left:4px;"></span></div>
+                  <div class="card-sub">累计注册 <b id="regCodeCount">-</b> / <b id="regCodeThreshold">-</b> 人，达到阈值后新员工必须凭 12 位邀请码才能注册。点击邀请码即可复制。</div>
+                  <div class="adm-tool">
+                    <input type="number" id="newCodeMaxUses" class="glass-input" style="width:88px;" min="1" value="1" title="该码允许通过的注册次数" placeholder="次数"/>
+                    <input type="datetime-local" id="newCodeExpires" class="glass-input" style="width:auto;" title="过期时间（可选，留空=永不过期）"/>
+                    <input type="text" id="newCodeNote" class="glass-input" style="flex:1;min-width:180px;" placeholder="备注（如「销售部 6 月用」，可选）" maxlength="64"/>
+                    <button class="btn btn-primary btn-sm" onclick="createRegCode()">生成邀请码</button>
+                    <button class="btn btn-ghost btn-sm" onclick="loadAdminRegCodes()">刷新</button>
+                  </div>
+                  <div class="table-wrap">
+                    <table id="regCodeTable"><thead><tr><th>邀请码</th><th>状态</th><th>已用/上限</th><th>过期</th><th>签发人</th><th>备注</th><th>签发时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+                  </div>
+                </div>
+              </section>
 
-          <div class="glass-card">
-            <div class="card-title">统计看板</div>
-            <div class="stats" id="adminStats"></div>
-          </div>
-          <div class="glass-card">
-            <div class="card-title">员工列表</div>
-            <div class="table-wrap">
-              <table id="userTable"><thead><tr><th>用户名</th><th>角色</th><th>注册时间</th><th>API 调用</th><th>生成图片</th><th>累计消耗(USD)</th></tr></thead><tbody></tbody></table>
-            </div>
-          </div>
-          <div class="glass-card">
-            <div class="card-title">全公司任务</div>
-            <div class="table-wrap">
-              <table id="allTasksTable"><thead><tr><th>任务ID</th><th>提交人</th><th>状态</th><th>进度</th><th>操作</th></tr></thead><tbody></tbody></table>
-            </div>
-            <div class="pager">
-              <button class="btn btn-ghost btn-sm" id="admPrev" onclick="changeAdmPage(-1)">上一页</button>
-              <span class="info" id="admPageInfo"></span>
-              <button class="btn btn-ghost btn-sm" id="admNext" onclick="changeAdmPage(1)">下一页</button>
-            </div>
-          </div>
+              <!-- Agnes Key 池 -->
+              <section class="adm-pane hidden" data-pane="pool">
+                <div class="glass-card">
+                  <div class="card-title">Agnes Key 池 <span class="api-status" id="poolStat" style="font-weight:600;margin-left:4px;"></span></div>
+                  <div class="card-sub">员工在右上角「🔑 API Key」绑定且<b>验证成功</b>的 Agnes Key 会自动计入此池（显示归属用户名）；管理员可在此直接添加「系统 Key」。生图时按「自有 Key → 系统 Key → 池内轮换」取用；<b>未绑定 Key 的员工每天最多免费生成 20 张</b>，绑定后不限量。</div>
+                  <div class="adm-tool">
+                    <input type="password" id="newSysKey" class="glass-input" style="flex:1;min-width:220px;" placeholder="粘贴要加入池的系统 Agnes Key（sk-…），入池后可在下方「测试」验证" autocomplete="off"/>
+                    <button class="btn btn-primary btn-sm" onclick="addSysKey()">加入池</button>
+                    <button class="btn btn-ghost btn-sm" onclick="loadAdminKeys()">刷新</button>
+                  </div>
+                  <div class="table-wrap">
+                    <table id="poolTable"><thead><tr><th>掩码 Key</th><th>归属</th><th>来源</th><th>状态</th><th>验证时间</th><th>最近使用</th><th>备注</th><th>操作</th></tr></thead><tbody></tbody></table>
+                  </div>
+                </div>
+              </section>
 
-          <div class="glass-card">
-            <div class="card-title">全公司图片记录</div>
-            <div class="card-sub">逐张查看全公司所有生成图片（含提交人），可按人员筛选并导出。</div>
-            <div class="form-row" style="align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-              <label class="field-inline">人员：
-                <select id="admImgUser" onchange="loadAdminImages(1)">
-                  <option value="">全部人员</option>
-                </select>
-              </label>
-              <button class="btn btn-ghost btn-sm" onclick="exportAdminCsv()">导出 CSV（按人员）</button>
-              <button class="btn btn-ghost btn-sm" onclick="exportAdminZip()">导出图片 ZIP（按人员）</button>
-            </div>
-            <div class="table-wrap">
-              <table id="adminImgTable"><thead><tr><th>提交人</th><th>提示词</th><th>模型</th><th>模式</th><th>状态</th><th>消耗</th><th>时间</th><th>原图</th><th>结果图</th></tr></thead><tbody></tbody></table>
-            </div>
-            <div class="pager">
-              <button class="btn btn-ghost btn-sm" id="admImgPrev" onclick="changeAdmImgPage(-1)">上一页</button>
-              <span class="info" id="admImgPageInfo"></span>
-              <button class="btn btn-ghost btn-sm" id="admImgNext" onclick="changeAdmImgPage(1)">下一页</button>
+              <!-- 统计看板 -->
+              <section class="adm-pane" data-pane="stats">
+                <div class="glass-card">
+                  <div class="card-title">统计看板</div>
+                  <div class="stats" id="adminStats"></div>
+                </div>
+              </section>
+
+              <!-- 员工列表 -->
+              <section class="adm-pane hidden" data-pane="users">
+                <div class="glass-card">
+                  <div class="card-title">员工列表</div>
+                  <div class="table-wrap">
+                    <table id="userTable"><thead><tr><th>用户名</th><th>角色</th><th>注册时间</th><th>API 调用</th><th>生成图片</th><th>累计消耗(USD)</th></tr></thead><tbody></tbody></table>
+                  </div>
+                </div>
+              </section>
+
+              <!-- 全公司任务 -->
+              <section class="adm-pane hidden" data-pane="tasks">
+                <div class="glass-card">
+                  <div class="card-title">全公司任务</div>
+                  <div class="table-wrap">
+                    <table id="allTasksTable"><thead><tr><th>任务ID</th><th>提交人</th><th>状态</th><th>进度</th><th>操作</th></tr></thead><tbody></tbody></table>
+                  </div>
+                  <div class="pager">
+                    <button class="btn btn-ghost btn-sm" id="admPrev" onclick="changeAdmPage(-1)">上一页</button>
+                    <span class="info" id="admPageInfo"></span>
+                    <button class="btn btn-ghost btn-sm" id="admNext" onclick="changeAdmPage(1)">下一页</button>
+                  </div>
+                </div>
+              </section>
+
+              <!-- 全公司图片记录 -->
+              <section class="adm-pane hidden" data-pane="images">
+                <div class="glass-card">
+                  <div class="card-title">全公司图片记录</div>
+                  <div class="card-sub">逐张查看全公司所有生成图片（含提交人），可按人员筛选并导出。</div>
+                  <div class="adm-tool">
+                    <label class="field-inline">人员：
+                      <select id="admImgUser" onchange="loadAdminImages(1)">
+                        <option value="">全部人员</option>
+                      </select>
+                    </label>
+                    <button class="btn btn-ghost btn-sm" onclick="exportAdminCsv()">导出 CSV（按人员）</button>
+                    <button class="btn btn-ghost btn-sm" onclick="exportAdminZip()">导出图片 ZIP（按人员）</button>
+                  </div>
+                  <div class="table-wrap">
+                    <table id="adminImgTable"><thead><tr><th>提交人</th><th>提示词</th><th>模型</th><th>模式</th><th>状态</th><th>消耗</th><th>时间</th><th>原图</th><th>结果图</th></tr></thead><tbody></tbody></table>
+                  </div>
+                  <div class="pager">
+                    <button class="btn btn-ghost btn-sm" id="admImgPrev" onclick="changeAdmImgPage(-1)">上一页</button>
+                    <span class="info" id="admImgPageInfo"></span>
+                    <button class="btn btn-ghost btn-sm" id="admImgNext" onclick="changeAdmImgPage(1)">下一页</button>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         </div>
@@ -1753,11 +1898,28 @@ async function loadHistory(page){
 function changeHistPage(delta){ const next=histPage+delta; if(next>=1) loadHistory(next); }
 
 /* ---------- 管理后台 ---------- */
+const _admLoaded = {};   // 记录各右侧面板是否已加载过数据（首次点开才请求）
 async function loadAdmin(){
-  await loadApiSettings();
-  await loadAdminKeys();
-  await loadAdminRegCodes();
-  const s=await api("GET","/api/admin/dashboard/stats"); if(s.status===401){clearToken();return location.reload();}
+  await loadApiSettings();   // 配置表单（Gemini / Agnes）始终先拉取
+  showAdminPane("stats");    // 默认落在「统计看板」，其余面板点开才加载
+}
+function showAdminPane(pane){
+  document.querySelectorAll("#tabAdmin .adm-pane")
+    .forEach(p => p.classList.toggle("hidden", p.dataset.pane !== pane));
+  document.querySelectorAll("#tabAdmin .adm-nav-item")
+    .forEach(b => b.classList.toggle("active", b.dataset.pane === pane));
+  if(_admLoaded[pane]) return;            // 已加载过 → 只切显示
+  _admLoaded[pane] = true;
+  if(pane === "stats")    loadAdminStats();
+  else if(pane === "users")   loadAdminUsers();
+  else if(pane === "tasks")   loadAllTasks(1);
+  else if(pane === "images")  loadAdminImages(1);
+  else if(pane === "pool")    loadAdminKeys();
+  else if(pane === "regcodes") loadAdminRegCodes();
+}
+async function loadAdminStats(){
+  const s=await api("GET","/api/admin/dashboard/stats");
+  if(s.status===401){clearToken();return location.reload();}
   if(s.ok){ const d=await s.json();
     let byModel="";
     const keys=Object.keys(d.cost_by_model||{});
@@ -1767,12 +1929,13 @@ async function loadAdmin(){
      <div class="stat"><div class="n">${d.total_api_calls}</div><div class="l">系统总 API 调用</div></div>
      <div class="stat"><div class="n">${d.total_images_generated}</div><div class="l">累计生成图片</div></div>
      <div class="stat"><div class="n">$${d.total_cost_usd.toFixed(2)}</div><div class="l">累计消耗 (USD)</div></div>` + byModel; }
+}
+async function loadAdminUsers(){
   const u=await api("GET","/api/admin/users");
+  if(u.status===401){clearToken();return location.reload();}
   if(u.ok){ const us=await u.json(); const tb=document.querySelector("#userTable tbody"); tb.innerHTML="";
     us.forEach(x=>{ const tr=document.createElement("tr"); tr.innerHTML=`<td>${x.username}</td><td>${x.role==="admin"?'<span class="role-badge">管理员</span>':'员工'}</td><td>${fmt(x.created_at)}</td><td>${x.total_api_calls}</td><td>${x.total_images_generated}</td><td>$${x.total_cost_usd.toFixed(4)}</td>`; tb.appendChild(tr); });
     populateAdmImgUsers(us); }
-  loadAllTasks(1);
-  loadAdminImages(1);
 }
 function populateAdmImgUsers(us){
   const sel=document.getElementById("admImgUser"); const prev=sel.value;
@@ -1799,7 +1962,9 @@ function changeAdmPage(delta){ const next=admPage+delta; if(next>=1) loadAllTask
 /* ---------- 全公司图片记录（逐张） ---------- */
 async function loadAdminImages(page){
   admImgPage=page;
-  const uid=document.getElementById("admImgUser").value;
+  const userSel=document.getElementById("admImgUser");
+  if(userSel && userSel.options.length <= 1) await loadAdminUsers();   // 首进先灌人员筛选
+  const uid=userSel.value;
   let url=`/api/admin/images?page=${page}&page_size=20`;
   if(uid) url+=`&user_id=${encodeURIComponent(uid)}`;
   const res=await api("GET",url);
@@ -1879,6 +2044,8 @@ async function loadApiSettings(){
     document.getElementById("agnesKey").value="";
     document.getElementById("agnesTier").value=d.agnes_user_tier||"default";
     document.getElementById("agnesSize").value=d.agnes_size_tier||"1K";
+    const dmSel=document.getElementById("agnesDefModel");
+    if(dmSel) dmSel.value=d.agnes_default_model||"";
     updateAgnesRpmHint();
     const ahint=document.getElementById("agnesKeyHint");
     ahint.textContent = d.agnes_is_key_set ? `当前已配置 Key：${d.agnes_key_masked}（如需更换，粘贴新 Key 后保存；留空表示不修改）` : "尚未配置 Agnes Key，请粘贴后保存。";
@@ -1913,6 +2080,8 @@ async function saveApiSettings(){
   if(abase) body.agnes_base_url=abase;
   body.agnes_user_tier=document.getElementById("agnesTier").value;
   body.agnes_size_tier=document.getElementById("agnesSize").value;
+  const dmSel=document.getElementById("agnesDefModel");
+  body.agnes_default_model = dmSel ? dmSel.value : "";
   const gemChk=document.getElementById("enableGeminiChk");
   body.enable_gemini = gemChk ? gemChk.checked : false;
   updateAgnesRpmHint();
@@ -2181,19 +2350,19 @@ async function loadAdminRegCodes(){
     const tr = document.createElement("tr");
     const expires = x.expires_at ? fmt(x.expires_at) : "永久";
     const statusBadge = x.status === "active"
-      ? (x.remaining > 0 ? '<span style="color:#16a34a;">生效中</span>' : '<span style="color:#64748b;">已用完</span>')
-      : '<span style="color:#ef4444;">已停用</span>';
-    const codeEsc = (x.code || "").replace(/[<>&"']/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"})[c]);
+      ? (x.remaining > 0 ? '<span class="st-mini green">生效中</span>' : '<span class="st-mini gray">已用完</span>')
+      : '<span class="st-mini red">已停用</span>';
+    const esc = c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"})[c];
+    const codeEsc = (x.code || "").replace(/[<>&"']/g, esc);
+    const noteEsc = (x.note || "").replace(/[<>&"']/g, esc);
     tr.innerHTML = `
-      <td><code style="background:#f1f5f9;padding:4px 8px;border-radius:6px;font-weight:600;letter-spacing:1px;">${codeEsc}</code>
-        <button class="btn btn-ghost btn-sm" style="margin-left:4px;padding:2px 8px;" onclick="copyRegCode('${codeEsc}')" title="复制邀请码">📋</button>
-      </td>
+      <td><span class="invcode" title="点击复制邀请码" onclick="copyRegCode('${codeEsc}')">${codeEsc}<span class="ic-copy">复制</span></span></td>
       <td>${statusBadge}</td>
       <td>${x.used_count} / ${x.max_uses}</td>
-      <td style="font-size:12px;">${expires}</td>
+      <td style="font-size:12px;color:#64748b;">${expires}</td>
       <td>${x.created_by || "-"}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(x.note||'').replace(/[<>&"']/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"})[c])}">${x.note || ""}</td>
-      <td style="font-size:12px;">${fmt(x.created_at)}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${noteEsc}">${x.note || "-"}</td>
+      <td style="font-size:12px;color:#64748b;">${fmt(x.created_at)}</td>
       <td><button class="btn btn-ghost btn-sm" style="color:#ef4444;" onclick="delRegCode(${x.id})">删除</button></td>
     `;
     tb.appendChild(tr);

@@ -37,6 +37,7 @@ _defaults = {
     "agnes_base_url": settings.agnes_base_url,
     "agnes_size_tier": settings.agnes_size_tier,
     "agnes_user_tier": settings.agnes_user_tier,
+    "agnes_default_model": settings.agnes_default_model,
     # 额外的系统级 Agnes Key（数组），由管理员直接编辑 data/settings.json
     # 追加；应用启动与后台保存配置时会同步进 api_keys 池。
     "agnes_extra_keys": [],
@@ -124,6 +125,12 @@ def get_agnes_user_tier() -> str:
         return (_load().get("agnes_user_tier", settings.agnes_user_tier) or "default").strip() or "default"
 
 
+def get_agnes_default_model() -> str:
+    """Agnes 模型 id（生成控制台默认选中）；空串 = 不指定。"""
+    with _lock:
+        return str(_load().get("agnes_default_model", settings.agnes_default_model) or "").strip()
+
+
 def mask_key(key: str) -> str:
     """Mask all but the last 4 characters for safe display."""
     if not key:
@@ -150,6 +157,7 @@ def get_public() -> dict:
         "agnes_base_url": data.get("agnes_base_url", settings.agnes_base_url),
         "agnes_size_tier": data.get("agnes_size_tier", settings.agnes_size_tier),
         "agnes_user_tier": data.get("agnes_user_tier", settings.agnes_user_tier),
+        "agnes_default_model": data.get("agnes_default_model", settings.agnes_default_model) or "",
         "free_daily_limit": data.get("free_daily_limit", settings.free_daily_limit),
     }
 
@@ -163,6 +171,7 @@ def update(
     agnes_base_url: str | None = None,
     agnes_size_tier: str | None = None,
     agnes_user_tier: str | None = None,
+    agnes_default_model: str | None = None,
     agnes_extra_keys: list | None = None,
 ) -> dict:
     """Persist admin-provided overrides. Empty strings are ignored so the
@@ -185,6 +194,9 @@ def update(
             data["agnes_size_tier"] = agnes_size_tier.strip().upper()
         if agnes_user_tier is not None and agnes_user_tier.strip():
             data["agnes_user_tier"] = agnes_user_tier.strip().lower()
+        if agnes_default_model is not None:
+            # 允许传空串清除（恢复跟随 gemini_model 的行为）。
+            data["agnes_default_model"] = agnes_default_model.strip()
         if agnes_extra_keys is not None:
             clean = [str(k).strip() for k in agnes_extra_keys if str(k).strip()]
             data["agnes_extra_keys"] = clean

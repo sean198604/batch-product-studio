@@ -345,6 +345,8 @@ class AdminSettings(SQLModel):
     agnes_base_url: str = ""
     agnes_size_tier: str = "1K"      # 1K / 2K / 3K / 4K
     agnes_user_tier: str = "default" # default / enterprise / tokenplan
+    # Agnes 默认模型 id（生成控制台默认选中）；空 = 不指定（跟随 gemini_model）
+    agnes_default_model: str = ""
 
 
 class AdminSettingsUpdate(SQLModel):
@@ -358,6 +360,7 @@ class AdminSettingsUpdate(SQLModel):
     agnes_base_url: Optional[str] = None
     agnes_size_tier: Optional[str] = None
     agnes_user_tier: Optional[str] = None
+    agnes_default_model: Optional[str] = None
 
 
 class ApiTestResult(SQLModel):

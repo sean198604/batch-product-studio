@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     agnes_base_url: str = "https://apihub.agnes-ai.cn/v1"
     agnes_size_tier: str = "1K"        # 1K / 2K / 3K / 4K（分辨率档）
     agnes_user_tier: str = "default"   # default / enterprise / tokenplan（账户档）
+    # Agnes 默认模型（生成控制台默认选中，优先级高于 gemini_model）。
+    # 留空 = 不指定，控制台默认沿用 gemini_model。仅接受 Agnes 模型 id
+    # （agnes-image-*.flash）；若值不在模型目录则自动退回 gemini_model。
+    agnes_default_model: str = ""
 
     # ---------- 模型开放 / 免费额度 ----------
     # Gemini 模型默认隐藏：仅当管理员在后台开启 enable_gemini 后，员工才

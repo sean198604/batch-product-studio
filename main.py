@@ -111,9 +111,14 @@ async def public_config() -> dict:
     if not enable_gemini:
         catalog = [m for m in catalog if m.get("provider") != "gemini"]
 
-    model = settings_store.get_model()
+    full = pricing.catalog()
+    # 默认模型优先级：管理员指定的 Agnes 默认模型 → gemini_model（兼容旧行为）。
+    agnes_default = settings_store.get_agnes_default_model()
+    model = agnes_default if any(
+        m.get("provider") == "agnes" and m.get("id") == agnes_default for m in full
+    ) else settings_store.get_model()
     if not enable_gemini and any(
-        m.get("provider") == "gemini" and m.get("id") == model for m in pricing.catalog()
+        m.get("provider") == "gemini" and m.get("id") == model for m in full
     ):
         # 管理员配置的默认模型是 Gemini 但开关已关闭 → 退回首个可用模型。
         model = next((m["id"] for m in catalog), "")
