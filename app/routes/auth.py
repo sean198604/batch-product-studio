@@ -86,6 +86,30 @@ async def register(
             detail="Username already exists.",
         )
 
+    # 禁止空用户名 / 纯空白用户名：历史遗留的 '' 用户就是这样混进来的。
+    # 统一 trim 后落库，避免「用户名没名字」的空壳账号再次出现。
+    username = (body.username or "").strip()
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="用户名不能为空。",
+        )
+    if len(username) > 32:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="用户名最长 32 个字符。",
+        )
+    if username != body.username:
+        # trim 后可能撞上已存在的账号（如 "alice" vs "alice "）。
+        dup = (
+            await session.execute(select(User).where(User.username == username))
+        ).scalars().first()
+        if dup is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already exists.",
+            )
+
     current_count = (
         await session.execute(select(func.count(User.id)))
     ).scalar() or 0
@@ -123,7 +147,7 @@ async def register(
     role = "admin" if current_count == 0 else "staff"
 
     user = User(
-        username=body.username,
+        username=username,  # 已 trim，杜绝空白用户名
         password_hash=hash_password(body.password),
         role=role,
     )

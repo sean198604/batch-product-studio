@@ -31,6 +31,7 @@ class User(SQLModel, table=True):
     username: str = Field(unique=True, index=True)
     password_hash: str
     role: str = Field(default="staff")  # "admin" | "staff"
+    note: Optional[str] = None          # 管理员备注（部门 / 真实姓名 / 用途等）
     total_api_calls: int = Field(default=0)
     total_images_generated: int = Field(default=0)
     total_cost_usd: float = Field(default=0.0)  # 累计消耗（USD）
@@ -161,10 +162,34 @@ class UserRead(SQLModel):
     id: int
     username: str
     role: str
+    note: Optional[str] = None   # 管理员备注
     total_api_calls: int
     total_images_generated: int
     total_cost_usd: float = 0.0
     created_at: datetime
+
+
+# ---- admin employee management (manual create / update / password reset) ----
+class AdminUserCreate(SQLModel):
+    """管理员手动开户。``role`` 默认 staff；``note`` 为部门/用途备注。"""
+
+    username: str
+    password: str = Field(min_length=6, max_length=128)
+    role: str = "staff"                    # "admin" | "staff"
+    note: Optional[str] = None
+
+
+class AdminUserUpdate(SQLModel):
+    """管理员编辑员工：改备注 / 角色。传 None 表示不修改该项。"""
+
+    note: Optional[str] = None
+    role: Optional[str] = None
+
+
+class AdminPasswordReset(SQLModel):
+    """管理员重置员工密码（新密码由管理员设定并线下告知员工）。"""
+
+    new_password: str = Field(min_length=6, max_length=128)
 
 
 # ---- my profile / personal Agnes key binding + quota ----

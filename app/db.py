@@ -78,6 +78,7 @@ async def _migrate() -> None:
         ("task_items", "cost_usd", "REAL"),
         ("task_items", "original_paths", "TEXT"),
         ("users", "total_cost_usd", "REAL"),
+        ("users", "note", "VARCHAR"),
     ]
     # Rows that predate a migration keep NULL in the new numeric columns.
     # ``UserRead``/``TaskSummary`` etc. require ``float`` (not None), so a NULL

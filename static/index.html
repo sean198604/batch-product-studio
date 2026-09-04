@@ -1096,8 +1096,19 @@
               <section class="adm-pane hidden" data-pane="users">
                 <div class="glass-card">
                   <div class="card-title">员工列表</div>
+                  <div class="card-sub">员工注册达上限后，可在此手动开户 / 重置密码 / 维护备注；删除员工会一并清理其全部任务记录与图片文件，操作前请确认。</div>
+                  <div class="adm-tool" style="margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+                    <input type="text" id="nuName" class="glass-input" style="flex:1; min-width:140px;" placeholder="用户名（不可为空）" maxlength="32" autocomplete="off"/>
+                    <input type="password" id="nuPass" class="glass-input" style="flex:1;" placeholder="初始密码（≥ 6 位）" maxlength="128" autocomplete="new-password"/>
+                    <select id="nuRole" class="glass-input" style="flex:0 0 110px;">
+                      <option value="staff">员工</option>
+                      <option value="admin">管理员</option>
+                    </select>
+                    <input type="text" id="nuNote" class="glass-input" style="flex:1; min-width:120px;" placeholder="备注（部门/用途，可选）" maxlength="64"/>
+                    <button class="btn btn-primary btn-sm" onclick="admAddUser()">添加员工</button>
+                  </div>
                   <div class="table-wrap">
-                    <table id="userTable"><thead><tr><th>用户名</th><th>角色</th><th>注册时间</th><th>API 调用</th><th>生成图片</th><th>累计消耗(USD)</th></tr></thead><tbody></tbody></table>
+                    <table id="userTable"><thead><tr><th>用户名</th><th>角色</th><th>备注</th><th>注册时间</th><th>API 调用</th><th>生成图片</th><th>累计消耗(USD)</th><th>操作</th></tr></thead><tbody></tbody></table>
                   </div>
                 </div>
               </section>
@@ -1934,13 +1945,86 @@ async function loadAdminUsers(){
   const u=await api("GET","/api/admin/users");
   if(u.status===401){clearToken();return location.reload();}
   if(u.ok){ const us=await u.json(); const tb=document.querySelector("#userTable tbody"); tb.innerHTML="";
-    us.forEach(x=>{ const tr=document.createElement("tr"); tr.innerHTML=`<td>${x.username}</td><td>${x.role==="admin"?'<span class="role-badge">管理员</span>':'员工'}</td><td>${fmt(x.created_at)}</td><td>${x.total_api_calls}</td><td>${x.total_images_generated}</td><td>$${x.total_cost_usd.toFixed(4)}</td>`; tb.appendChild(tr); });
+    us.forEach(x=>{ tb.appendChild(admUserRow(x)); });
     populateAdmImgUsers(us); }
+}
+function admUserRow(x){
+  const tr=document.createElement("tr");
+  const mk=(tag,text)=>{ const el=document.createElement(tag); if(text!==undefined) el.textContent=text; return el; };
+  // 用户名（空名红色占位，提示管理员处理）
+  const uname=(x.username||"").trim();
+  const tdU=mk("td");
+  if(uname){ tdU.appendChild(mk("span", x.username)); }
+  else { const s=mk("span","(空用户名)"); s.style.color="#ef4444"; tdU.appendChild(s); }
+  // 角色
+  const tdR=mk("td");
+  if(x.role==="admin"){ tdR.innerHTML='<span class="role-badge">管理员</span>'; } else { tdR.textContent="员工"; }
+  // 备注（过长省略 + hover 全文）
+  const note=(x.note||"").trim();
+  const tdN=mk("td");
+  if(note){ const s=mk("span", note); s.title=note; s.style.cssText="max-width:180px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;"; tdN.appendChild(s); }
+  else { const s=mk("span","-"); s.style.color="#94a3b8"; tdN.appendChild(s); }
+  // 注册时间 / 用量
+  const tdT=mk("td", fmt(x.created_at)); tdT.style.fontSize="12px";
+  tr.append(tdU, tdR, tdN, tdT,
+    mk("td", x.total_api_calls), mk("td", x.total_images_generated),
+    mk("td", "$"+(Number(x.total_cost_usd)||0).toFixed(4)));
+  // 操作列
+  const tdOps=mk("td"); tdOps.style.whiteSpace="nowrap";
+  const mkBtn=(text,cls,fn)=>{ const b=document.createElement("button"); b.className="btn "+cls+" btn-sm"; b.textContent=text; b.onclick=fn; b.style.marginRight="5px"; return b; };
+  const dispName=uname||"(空用户名)";
+  tdOps.appendChild(mkBtn("备注","btn-ghost", ()=>admSetNote(x.id, dispName, note)));
+  tdOps.appendChild(mkBtn("重置密码","btn-ghost", ()=>admResetPass(x.id, dispName)));
+  const isSelf=meUser && x.id===meUser.id;
+  if(!isSelf){ tdOps.appendChild(mkBtn("删除","btn-danger", ()=>admDelUser(x.id, dispName))); }
+  else { const s=mk("span","(当前账号)"); s.style.color="#94a3b8"; s.style.fontSize="12px"; tdOps.appendChild(s); }
+  tr.appendChild(tdOps);
+  return tr;
+}
+async function admAddUser(){
+  const name=document.getElementById("nuName").value.trim();
+  const pass=document.getElementById("nuPass").value;
+  const role=document.getElementById("nuRole").value;
+  const note=document.getElementById("nuNote").value.trim();
+  if(!name){ showToast("用户名不能为空"); return; }
+  if(pass.length<6){ showToast("密码至少 6 位"); return; }
+  const r=await api("POST","/api/admin/users",{json:{username:name,password:pass,role,note}});
+  if(r.status===401){clearToken();return location.reload();}
+  if(r.ok){ const d=await r.json();
+    showToast(`已创建${d.role==="admin"?"管理员":"员工"}「${d.username}」`);
+    document.getElementById("nuName").value=""; document.getElementById("nuPass").value="";
+    document.getElementById("nuRole").value="staff"; document.getElementById("nuNote").value="";
+    loadAdminUsers();
+  } else { const d=await r.json().catch(()=>({})); showToast("创建失败："+(d.detail||"未知错误")); }
+}
+async function admSetNote(id, uname, cur){
+  const note=prompt(`为「${uname}」设置备注（留空并确定 = 清除备注）：`, cur||"");
+  if(note===null) return;
+  const r=await api("PUT",`/api/admin/users/${id}`,{json:{note}});
+  if(r.status===401){clearToken();return location.reload();}
+  if(r.ok){ showToast("备注已更新"); loadAdminUsers(); }
+  else { const d=await r.json().catch(()=>({})); showToast("更新失败："+(d.detail||"")); }
+}
+async function admResetPass(id, uname){
+  const p=prompt(`为「${uname}」设置新密码（至少 6 位；请线下告知员工）：`);
+  if(p===null) return;
+  if(p.length<6){ showToast("密码至少 6 位"); return; }
+  const r=await api("PUT",`/api/admin/users/${id}/password`,{json:{new_password:p}});
+  if(r.status===401){clearToken();return location.reload();}
+  if(r.ok){ showToast(`「${uname}」密码已重置`); }
+  else { const d=await r.json().catch(()=>({})); showToast("重置失败："+(d.detail||"")); }
+}
+async function admDelUser(id, uname){
+  if(!confirm(`确认删除员工「${uname}」？\n将同时清理其全部任务记录、图片文件与绑定的 API Key，此操作不可恢复。`)) return;
+  const r=await api("DELETE",`/api/admin/users/${id}`);
+  if(r.status===401){clearToken();return location.reload();}
+  if(r.ok){ showToast(`已删除「${uname}」`); loadAdminUsers(); }
+  else { const d=await r.json().catch(()=>({})); showToast("删除失败："+(d.detail||"")); }
 }
 function populateAdmImgUsers(us){
   const sel=document.getElementById("admImgUser"); const prev=sel.value;
   sel.innerHTML='<option value="">全部人员</option>';
-  (us||[]).forEach(x=>{ const o=document.createElement("option"); o.value=x.id; o.textContent=x.username; sel.appendChild(o); });
+  (us||[]).forEach(x=>{ const o=document.createElement("option"); o.value=x.id; o.textContent=(x.username||"").trim()||"(空用户名)"; sel.appendChild(o); });
   if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
 }
 async function loadAllTasks(page){

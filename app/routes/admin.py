@@ -1,6 +1,7 @@
 """Admin-only dashboard & management routes."""
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import json
@@ -12,6 +13,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,9 +26,12 @@ from app import pool as keypool
 from app import settings_store
 from app.models import (
     AdminImageRecord,
+    AdminPasswordReset,
     AdminSettings,
     AdminSettingsUpdate,
     AdminStats,
+    AdminUserCreate,
+    AdminUserUpdate,
     ApiKey,
     ApiTestResult,
     GenerationTask,
@@ -43,6 +48,7 @@ from app.models import (
     User,
     UserRead,
 )
+from app.security import hash_password
 from app.settings_store import get_public, update as update_settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -400,6 +406,198 @@ async def list_users(
         await session.execute(select(User).order_by(desc(User.created_at)))
     ).scalars().all()
     return [UserRead.model_validate(u) for u in users]
+
+
+# --------------------------------------------------------------------------- #
+# 员工管理：手动开户 / 编辑备注·角色 / 重置密码 / 删除
+# --------------------------------------------------------------------------- #
+def _normalize_username(raw: str) -> str:
+    """Trim + basic sanity. Returns the cleaned name or raises 400."""
+    name = (raw or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="用户名不能为空。")
+    if len(name) > 32:
+        raise HTTPException(status_code=400, detail="用户名最长 32 个字符。")
+    return name
+
+
+def _normalize_role(role: str) -> str:
+    role = (role or "staff").strip().lower()
+    if role not in ("admin", "staff"):
+        raise HTTPException(status_code=400, detail="角色只能是 admin 或 staff。")
+    return role
+
+
+async def _count_admins(session: AsyncSession) -> int:
+    return (
+        await session.execute(select(func.count(User.id)).where(User.role == "admin"))
+    ).scalar() or 0
+
+
+async def _count_running_tasks(session: AsyncSession, user_id: int) -> int:
+    """pending/processing 任务数 —— 有进行中任务时禁止删除员工，避免后台
+    worker 拿到已删除的 task 记录。"""
+    return (
+        await session.execute(
+            select(func.count(GenerationTask.id)).where(
+                GenerationTask.user_id == user_id,
+                GenerationTask.status.in_(["pending", "processing"]),
+            )
+        )
+    ).scalar() or 0
+
+
+def _unlink_many(rel_paths: list[str], storage_dir: str) -> int:
+    """Best-effort removal of storage-relative files (sync, runs in a thread)."""
+    removed = 0
+    for rel in rel_paths:
+        if not rel:
+            continue
+        try:
+            p = os.path.join(storage_dir, rel)
+            if os.path.isfile(p):
+                os.unlink(p)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+async def _collect_user_storage_paths(user_id: int, session: AsyncSession) -> list[str]:
+    """Gather every storage-relative path owned by the user's task items."""
+    items = (
+        await session.execute(select(TaskItem).where(TaskItem.user_id == user_id))
+    ).scalars().all()
+    paths: list[str] = []
+    for it in items:
+        for rel in (it.original_path, it.output_path):
+            if rel:
+                paths.append(rel)
+        if it.original_paths:
+            try:
+                paths.extend(json.loads(it.original_paths))
+            except Exception:
+                pass
+    return paths
+
+
+@router.post("/users", response_model=UserRead, status_code=201)
+async def create_user(
+    body: AdminUserCreate,
+    admin_user: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> UserRead:
+    """管理员手动开户（员工注册满额后由后台创建或签发邀请码）。"""
+    username = _normalize_username(body.username)
+    role = _normalize_role(body.role)
+    dup = (
+        await session.execute(select(User).where(User.username == username))
+    ).scalars().first()
+    if dup is not None:
+        raise HTTPException(status_code=409, detail="用户名已存在。")
+    user = User(
+        username=username,
+        password_hash=hash_password(body.password),
+        role=role,
+        note=(body.note or "").strip() or None,
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return UserRead.model_validate(user)
+
+
+@router.put("/users/{user_id}", response_model=UserRead)
+async def update_user(
+    user_id: int,
+    body: AdminUserUpdate,
+    admin_user: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> UserRead:
+    """编辑员工：改备注 / 改角色。传 None 的字段保持不变。"""
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="员工不存在。")
+
+    if body.note is not None:
+        user.note = (body.note or "").strip() or None
+    if body.role is not None:
+        role = _normalize_role(body.role)
+        if role != user.role:
+            if user.role == "admin" and role != "admin":
+                if user.id == admin_user.id:
+                    raise HTTPException(status_code=400, detail="不能修改自己的角色。")
+                if await _count_admins(session) <= 1:
+                    raise HTTPException(status_code=400, detail="系统至少保留一名管理员。")
+            user.role = role
+
+    await session.commit()
+    await session.refresh(user)
+    return UserRead.model_validate(user)
+
+
+@router.put("/users/{user_id}/password", response_model=dict)
+async def reset_user_password(
+    user_id: int,
+    body: AdminPasswordReset,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """管理员重置员工密码。新密码由管理员设定后线下告知员工。"""
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="员工不存在。")
+    user.password_hash = hash_password(body.new_password)
+    await session.commit()
+    return {"ok": True, "user_id": user.id, "username": user.username}
+
+
+@router.delete("/users/{user_id}", response_model=dict)
+async def delete_user(
+    user_id: int,
+    admin_user: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """删除员工账号及其全部关联数据（任务 / 图片记录 / 绑定 Key / 磁盘文件）。
+
+    保护规则：
+      * 不能删除自己当前登录的账号；
+      * 系统至少保留一名管理员（删除最后一位管理员会被拒绝）；
+      * 员工仍有 pending/processing 任务时拒绝删除，需等待完成。
+    """
+    if user_id == admin_user.id:
+        raise HTTPException(status_code=400, detail="不能删除自己当前登录的账号。")
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="员工不存在。")
+    if user.role == "admin" and await _count_admins(session) <= 1:
+        raise HTTPException(status_code=400, detail="系统至少保留一名管理员，不能删除最后一位。")
+    running = await _count_running_tasks(session, user_id)
+    if running:
+        raise HTTPException(
+            status_code=409,
+            detail=f"该员工还有 {running} 个进行中任务，请等待完成后再删除。",
+        )
+
+    storage_paths = await _collect_user_storage_paths(user_id, session)
+    await session.execute(sa_delete(TaskItem).where(TaskItem.user_id == user_id))
+    await session.execute(sa_delete(GenerationTask).where(GenerationTask.user_id == user_id))
+    await session.execute(sa_delete(ApiKey).where(ApiKey.owner_user_id == user_id))
+    await session.delete(user)
+    await session.commit()
+
+    removed = 0
+    if storage_paths:
+        removed = await asyncio.to_thread(
+            _unlink_many, storage_paths, settings.storage_dir
+        )
+    return {
+        "ok": True,
+        "user_id": user_id,
+        "deleted_username": user.username,
+        "removed_files": removed,
+        "removed_records": len(storage_paths),
+    }
 
 
 @router.get("/tasks/all", response_model=PagedTasks)
