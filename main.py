@@ -16,8 +16,11 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
+import asyncio
+
 from app import worker
 from app import pool as keypool
+from app import storage_maintenance
 from app.config import settings
 from app.db import init_db
 from app.routes import admin, auth, profile, tasks
@@ -47,9 +50,19 @@ async def lifespan(app: FastAPI):
     # 把 data/settings.json 里的系统 Agnes Key（默认 Key + 追加 Key）同步进池。
     await keypool.sync_system_keys_from_settings()
     await worker.start_worker()
+    # 磁盘治理：后台维护循环（过期清理 + 容量兜底 + 占用告警）。
+    _maintenance_task = asyncio.create_task(
+        storage_maintenance.run_maintenance_loop(),
+        name="storage-maintenance",
+    )
     logger.info("Application started.")
     yield
     # ---- shutdown ----
+    _maintenance_task.cancel()
+    try:
+        await _maintenance_task
+    except (asyncio.CancelledError, Exception):
+        pass
     await worker.stop_worker()
     logger.info("Application stopped.")
 

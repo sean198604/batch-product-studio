@@ -67,6 +67,18 @@ class Settings(BaseSettings):
     data_dir: str = "data"
     sqlite_path: str = "data/app.db"
 
+    # ---------- Storage maintenance (disk governance) ----------
+    # 磁盘上限（MB）。storage 目录（uploads + outputs）累计超过该值时，
+    # 后台维护循环会自动清理最老的任务，并拒绝新的上传请求，直到降回上限内。
+    storage_max_mb: int = 10240
+    # 任务保留天数。超过该天数的任务（连同原图与生成图）会被自动删除。
+    storage_retention_days: int = 30
+    # 占用告警阈值（占 storage_max_mb 的比例，0.0-1.0）。超过即记录 WARN 日志
+    # 并写入 data/storage_alert.json，供宿主机 cron 监控脚本读取后发告警。
+    storage_warn_ratio: float = 0.8
+    # 维护循环检查间隔（小时）。到点即执行「过期清理 + 容量兜底」。
+    storage_cleanup_interval_hours: int = 6
+
     @property
     def resolved_db_path(self) -> Path:
         """Absolute, canonical path to the SQLite file.

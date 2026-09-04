@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import worker
 from app import pool as keypool
 from app import settings_store
+from app import storage_maintenance
 from app.config import settings
 from app.db import get_session
 from app.deps import get_current_user, require_admin
@@ -174,6 +175,17 @@ async def create_task(
 ) -> TaskSummary:
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
+
+    # ---- 磁盘容量闸门：占用已达上限时拒绝新上传，避免打满磁盘 ----
+    has_room, ratio = storage_maintenance.storage_has_room()
+    if not has_room:
+        raise HTTPException(
+            status_code=507,
+            detail=(
+                f"服务器图片存储已满（{ratio:.0%}），暂时无法创建新任务。"
+                "请联系管理员清理历史任务或扩充磁盘后再试。"
+            ),
+        )
 
     # ---- Gemini 门禁：默认隐藏，管理员开启后才能使用 ----
     chosen_model = (model or "").strip() or settings_store.get_model() or ""
