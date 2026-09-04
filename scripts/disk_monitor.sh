@@ -6,7 +6,7 @@
 # 双重检查：
 #   1. 应用层告警文件 data/storage_alert.json（由 storage_maintenance 每 6h 写入）
 #   2. 直接 du 磁盘占用（兜底，即使应用层没写 alert 文件也能发现）
-# 任一项超阈值即发邮件。
+# 任一项超阈值即发 Telegram 告警。
 
 set -u
 
@@ -19,10 +19,14 @@ WARN_MB=8192      # storage 告警阈值（80% of 10GB）
 MAX_MB=10240      # storage 上限
 DISK_WARN_PCT=80  # 整盘使用率告警阈值
 
-# ---- 邮件配置（部署时填写）----
-MAIL_TO="__MAIL_TO__"
-MAIL_FROM="__MAIL_FROM__"
-SUBJECT_PREFIX="[batch-product-studio 磁盘告警]"
+# ---- Telegram 告警配置 ----
+# token / chat_id 从独立配置文件读取（不入 git，避免泄露到仓库）
+TG_CONF="$APP_DIR/data/tg_alert.conf"
+if [ -f "$TG_CONF" ]; then
+    . "$TG_CONF"
+fi
+TG_TOKEN="${TG_TOKEN:-}"
+TG_CHAT_ID="${TG_CHAT_ID:-}"
 
 HOSTNAME=$(hostname)
 NOW=$(date '+%Y-%m-%d %H:%M:%S %Z')
@@ -85,20 +89,23 @@ storage 目录：${STORAGE_MB}MB / 上限 ${MAX_MB}MB（告警线 ${WARN_MB}MB�
 
 触发原因：
 ${REASONS}
-
 建议：登录后台「图片管理」归档后删除历史任务，或登录服务器手动清理：
   du -sh ${STORAGE_DIR}
 "
 
     echo "$BODY"
 
-    # 发邮件（若已配置）
-    if [ "$MAIL_TO" != "__MAIL_TO__" ] && command -v msmtp >/dev/null 2>&1; then
-        printf "From: %s\nTo: %s\nSubject: %s %s\n\n%s\n" \
-            "$MAIL_FROM" "$MAIL_TO" "$SUBJECT_PREFIX" "$HOSTNAME" "$BODY" | msmtp "$MAIL_TO"
-        echo "[mail] 已发送告警邮件至 $MAIL_TO"
+    # 发 Telegram 告警（若已配置）
+    if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT_ID" ]; then
+        if curl -sS --max-time 15 -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d chat_id="${TG_CHAT_ID}" \
+            --data-urlencode "text=${BODY}" >/dev/null 2>&1; then
+            echo "[tg] 已发送 Telegram 告警至 chat_id=${TG_CHAT_ID}"
+        else
+            echo "[tg] Telegram 发送失败"
+        fi
     else
-        echo "[mail] 未发送（MAIL_TO 未配置或 msmtp 未安装）"
+        echo "[tg] 未发送（data/tg_alert.conf 未配置 TG_TOKEN/TG_CHAT_ID）"
     fi
     exit 1
 else
