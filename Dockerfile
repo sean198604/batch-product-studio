@@ -19,5 +19,7 @@ COPY . .
 RUN mkdir -p storage/uploads storage/outputs data
 
 # Single worker is REQUIRED: the queue + task state are process-local.
+# 端口保持 7021 — 绕代理缓存由 main.py 的 no_cache_html middleware 负责
+#（Cache-Control: no-store + Surrogate-Control + Vary: * + CDN-Cache-Control）。
 EXPOSE 7021
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7021", "--workers", "1"]

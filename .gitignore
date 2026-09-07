@@ -25,3 +25,10 @@ docs/_shot.js
 # (hardcode local Windows paths, admin password, local Chrome executable)
 scripts/
 
+# Ad-hoc single-file HTML snapshots copied here from other projects
+# (claw-dashboard-portal / 8888 exports etc.) — not part of this app
+c.html
+p.html
+p8888.html
+v.html
+

@@ -86,8 +86,16 @@ async def no_cache_html(request, call_next):
 
     背景：index.html 之前只有 ETag / Last-Modified，无 Cache-Control，
     其他设备的浏览器会长期复用旧缓存的 HTML（用户在其他设备一直看到
-    旧版模型卡片的根因）。这里强制 no-store，保证所有设备每次刷新
-    都从服务端拉最新 HTML（~170KB，企业内网开销可忽略）。
+    旧版模型卡片的根因）。这里强制 no-store + Surrogate-Control + Vary，
+    保证所有 CDN/反向代理/浏览器都遵守，**任何设备任何网络都不会缓存老 HTML**。
+
+    头字段说明：
+      Cache-Control: no-store         — 浏览器/中间缓存不准存任何副本
+      Pragma: no-cache                — HTTP/1.0 兼容
+      Expires: 0                      — 立即过期
+      Surrogate-Control: no-store     — CDN/代理专用，比 Cache-Control 更强，主流代理遵守
+      Vary: *                         — 强制所有变体独立缓存，代理不能用其他缓存条目替代
+      CDN-Cache-Control: no-store     — Cloudflare 等专用兜底
     """
     response = await call_next(request)
     ct = response.headers.get("content-type", "")
@@ -95,6 +103,9 @@ async def no_cache_html(request, call_next):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+        response.headers["Surrogate-Control"] = "no-store"
+        response.headers["Vary"] = "*"
+        response.headers["CDN-Cache-Control"] = "no-store"
     return response
 
 

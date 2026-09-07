@@ -315,6 +315,135 @@ async def add_system_key(
     return await _pool_key_out(row, None)
 
 
+@router.get("/keys/export")
+async def export_pool_keys(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """导出 Agnes Key 池为 CSV（含完整 Key，仅管理员可调用，用于备份/迁移）。
+
+    列：api_key(完整明文), provider, source, owner, status, note,
+        created_at, validated_at, last_used_at。
+    """
+    rows = (
+        await session.execute(
+            select(ApiKey, User.username)
+            .outerjoin(User, ApiKey.owner_user_id == User.id)
+            .where(ApiKey.provider == "agnes")
+            .order_by(ApiKey.id.asc())
+        )
+    ).all()
+    buf = io.StringIO()
+    buf.write("\ufeff")  # Excel 友好 BOM
+    writer = csv.writer(buf)
+    writer.writerow([
+        "api_key", "provider", "source", "owner", "status", "note",
+        "created_at", "validated_at", "last_used_at",
+    ])
+    for row, username in rows:
+        writer.writerow([
+            row.key_value,
+            row.provider,
+            row.source,
+            username or "",
+            row.status,
+            row.note or "",
+            row.created_at.isoformat() if row.created_at else "",
+            row.validated_at.isoformat() if row.validated_at else "",
+            row.last_used_at.isoformat() if row.last_used_at else "",
+        ])
+    data = buf.getvalue().encode("utf-8-sig")
+    fname = f"agnes_keys_export_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
+@router.post("/keys/import", status_code=201)
+async def import_system_keys(
+    body: dict,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """批量导入系统 Key（管理员）。body 形如 {"keys": ["sk-xxx", "sk-yyy 备注", ...]}。
+
+    每行宽容解析：支持 ``sk-xxx``、``sk-xxx 备注``、``sk-xxx,备注``、
+    ``sk-xxx\t备注``；空行忽略；已存在于池中的 Key 自动跳过（不报错）。
+    与单条「加入池」一致：入库不做 live probe，状态先记为 valid，
+    导入后可在表格里逐个「测试」批量验证。
+    """
+    raw_lines = body.get("keys") if isinstance(body, dict) else None
+    if not isinstance(raw_lines, list):
+        raise HTTPException(status_code=400, detail='请求体应为 {"keys": ["sk-…", ...]}。')
+
+    existing = set(
+        (await session.execute(select(ApiKey.key_value))).scalars().all()
+    )
+    now = keypool._utcnow()
+    added_keys: list[ApiKey] = []
+    skipped = 0
+    invalid = 0
+    sample_bad: list[str] = []
+    for raw in raw_lines:
+        if raw is None:
+            continue
+        line = str(raw).strip()
+        if not line:
+            continue
+        # 首段 = Key；剩余（逗号/分号/制表符/空白分隔）作备注。
+        key = line.split()[0].strip().rstrip(",，;；")
+        note = ""
+        rest = line[len(key):].lstrip(",，;； \t")
+        if rest:
+            note = rest.strip()
+        # 轻量合法性：Agnes Key 形如 sk-…（通常 30+ 字符），过短视为非法行。
+        if not key.startswith("sk-") or len(key) < 20:
+            invalid += 1
+            if len(sample_bad) < 3:
+                sample_bad.append(line[:60])
+            continue
+        if key in existing:
+            skipped += 1
+            continue
+        existing.add(key)
+        added_keys.append(
+            ApiKey(
+                provider="agnes",
+                source="system",
+                owner_user_id=None,
+                key_value=key,
+                status="valid",
+                note=note or "批量导入",
+                created_at=now,
+            )
+        )
+
+    if added_keys:
+        session.add_all(added_keys)
+        try:
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            raise HTTPException(status_code=500, detail=f"入库失败：{exc}")
+
+    detail = (
+        f"成功导入 {len(added_keys)} 个"
+        + (f"，跳过 {skipped} 个已存在" if skipped else "")
+        + (f"，{invalid} 行格式非法" if invalid else "")
+        + "。已入库 Key 状态暂为 valid，建议在表格里点「测试」逐个验证。"
+    )
+    if sample_bad:
+        detail += f" 非法行示例：{' | '.join(sample_bad)}"
+    return {
+        "added": len(added_keys),
+        "skipped_duplicates": skipped,
+        "invalid_lines": invalid,
+        "detail": detail,
+    }
+
+
 @router.post("/keys/{key_id}/test", response_model=PoolTestResult)
 async def test_pool_key(
     key_id: int,

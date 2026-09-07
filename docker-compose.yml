@@ -4,6 +4,9 @@ services:
     image: batch-product-studio:latest
     container_name: batch-product-studio
     ports:
+      # 端口保持 7021 — 绕代理缓存由 main.py 的 no_cache_html middleware 负责
+      #（Cache-Control: no-store + Surrogate-Control + Vary: * + CDN-Cache-Control），
+      # 任何设备访问 7021 都拿到当前服务端版本。
       - "7021:7021"
     env_file:
       # Injects GEMINI_API_KEY, JWT_SECRET_KEY, HTTP(S)_PROXY, etc. from .env
