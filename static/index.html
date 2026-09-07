@@ -1,8 +1,27 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="glass">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script>
+    /* 首帧前应用持久化主题，避免刷新闪烁（localStorage -> html[data-theme]） */
+    (function () {
+      try {
+        var t = localStorage.getItem("bps_theme");
+        if (t === "clean") {
+          document.documentElement.setAttribute("data-theme", "clean");
+        } else if (t !== "glass") {
+          /* 未显式选择过主题：移动端默认「简洁」主题，桌面默认「液态玻璃」 */
+          var mobile = false;
+          try {
+            mobile = (window.matchMedia && window.matchMedia("(max-width: 768px)").matches)
+                  || (window.innerWidth < 768);
+          } catch (e) {}
+          if (mobile) document.documentElement.setAttribute("data-theme", "clean");
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%234f6ef7%27%2F%3E%3Ccircle%20cx%3D%2721%27%20cy%3D%2712%27%20r%3D%273.2%27%20fill%3D%27%23fff%27%2F%3E%3Cpath%20d%3D%27M4%2024%20L12.5%2014.5%20L17.5%2019.5%20L21.5%2015%20L28%2024%20Z%27%20fill%3D%27%23fff%27%20opacity%3D%270.95%27%2F%3E%3C%2Fsvg%3E" />
   <title>批量产品场景图生成器</title>
   <style>
@@ -476,8 +495,33 @@
       .gh-star { padding: 0 10px; }
       .top-bar { padding: 0 10px; }
     }
+    @media (max-width: 480px) {
+      .brand-name { display: none; }                       /* 极窄屏仅保留品牌 logo */
+      .gh-star .gh-text { display: none; }                   /* Star 仅保留 ⭐ 图标 */
+    }
     @media (prefers-reduced-motion: reduce) {
       .anim-view, .view-slide-next, .view-slide-prev, .glass-card, .item, .btn, .nav-tab, .nav-slider, .modal-card, .modal-overlay { animation: none; transition: none; }
+    }
+
+    /* ====================================================================
+       移动端 / iOS 触控与安全区优化（iPhone 刘海屏 + iOS HIG 触控规范）
+       ==================================================================== */
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    @media (max-width: 768px) {
+      /* 触控目标 ≥44px（iOS HIG 最小可点面积）；chip 取 40px 紧凑档 */
+      .btn, .nav-tab, .theme-toggle, .gh-star, .modal-tabs button { min-height: 44px; }
+      .nav-tab { height: 44px; padding: 0 16px; }
+      .chip { min-height: 40px; }
+      /* 输入框字号 ≥16px，防止 iOS 聚焦时自动放大整个页面（著名 Safari 行为） */
+      input, textarea, select { font-size: 16px !important; }
+      /* 刘海屏安全区：顶栏整体下移、内容顶部让位、底部留白 */
+      .top-bar {
+        height: calc(var(--header-h) + env(safe-area-inset-top));
+        padding-top: env(safe-area-inset-top);
+      }
+      .page-layout { padding-top: calc(var(--header-h) + env(safe-area-inset-top)); }
+      .main-content { padding: 16px 14px calc(36px + env(safe-area-inset-bottom)); }
     }
 
     .hidden { display: none !important; }
@@ -544,6 +588,43 @@
       box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
     }
     .scene-card.active .sc-check { display: flex; }
+
+    /* ====== 场景卡片 hover tooltip 浮层（统一样式，玻璃/简洁双主题自动适配） ====== */
+    .scene-card { position: relative; }   /* .scene-card 已 position:relative，无需重设 */
+    .scene-tip {
+      position: fixed; z-index: 260; max-width: 280px; min-width: 180px;
+      padding: 10px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.55;
+      pointer-events: none; opacity: 0; transform: translateY(2px) scale(0.98);
+      transition: opacity 0.18s var(--spring), transform 0.18s var(--spring);
+      /* 玻璃主题默认样式 */
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.92);
+      box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+    }
+    .scene-tip.show { opacity: 1; transform: translateY(0) scale(1); }
+    .scene-tip::after {
+      content: ""; position: absolute; left: var; left: 50%; transform: translateX(-50%);
+      width: 10px; height: 10px; background: inherit; border: inherit;
+      border-bottom: 0; border-right: 0;
+      /* arrow default hidden; JS 会按需翻转 */
+      top: auto; bottom: -5px; transform: translateX(-50%) rotate(225deg);
+    }
+    .scene-tip[data-arrow="top"]::after { bottom: auto; top: -5px; transform: translateX(-50%) rotate(45deg); }
+    /* 简洁主题：纯白细边 + 软阴影，去毛玻璃 */
+    html[data-theme="clean"] .scene-tip {
+      background: #ffffff;
+      border: 1px solid #d8dde6;
+      box-shadow: 0 12px 30px rgba(16, 24, 40, 0.14);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    html[data-theme="clean"] .scene-tip::after { background: #ffffff; border-color: #d8dde6; }
+    /* 移动端不显示 hover；可由 JS 切到 "active" 手动控制 */
+    @media (hover: none) { .scene-tip { transition: opacity 0.2s; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .scene-tip { transition: opacity 0.1s; transform: none !important; }
     .sc-tag {
       position: absolute; top: 9px; right: 9px; font-size: 10px; font-weight: 700;
       padding: 1px 7px; border-radius: 999px; background: rgba(79, 110, 247, 0.12); color: #4f6ef7;
@@ -722,6 +803,196 @@
     }
     .field-inline { font-size: 13px; color: #475569; display: inline-flex; align-items: center; gap: 6px; }
     .field-inline select { padding: 6px 8px; border-radius: 9px; border: 1px solid rgba(15,23,42,.15); background: #fff; font-size: 13px; }
+
+    /* ====================================================================
+       14. 简洁主题「Clean」覆盖层（Aceternity-light 风格：纯白底 · 细描边 ·
+           克制阴影 · 去玻璃模糊与彩色渐变）—— html[data-theme="clean"]
+       ==================================================================== */
+    html[data-theme="clean"] {
+      --bg: #f6f7f9;
+      --text-main: #16181d;
+      --text-muted: #6b7280;
+      --border: #e6e8ec;
+      --glass-bg: rgba(255, 255, 255, 0.92);
+      --glass-bg-strong: rgba(255, 255, 255, 0.98);
+      --glass-border: rgba(255, 255, 255, 0.9);
+      --glass-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      --glass-shadow-lg: 0 18px 42px rgba(16, 24, 40, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+    /* 关闭所有毛玻璃模糊（简洁主题 = 无 backdrop-filter） */
+    html[data-theme="clean"] *, html[data-theme="clean"] *::before, html[data-theme="clean"] *::after {
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+    /* 页面底：纯白/极浅中性，去掉四角彩色渐变 */
+    html[data-theme="clean"] body {
+      color: var(--text-main);
+      background: #f6f7f9;
+    }
+    /* 顶栏：白底细描边，去毛玻璃 */
+    html[data-theme="clean"] .top-bar {
+      background: rgba(255, 255, 255, 0.86);
+      border-bottom: 1px solid #e9ebf0;
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(16, 24, 40, 0.05);
+    }
+    html[data-theme="clean"] .brand-name { color: #16181d; }
+    html[data-theme="clean"] .brand-sub { color: #9aa1ac; }
+    html[data-theme="clean"] .top-user { color: #374151; }
+    /* 顶栏导航：滑动胶囊改浅品牌色实底 */
+    html[data-theme="clean"] .nav-slider {
+      background: rgba(79, 110, 247, 0.1);
+      border: 1px solid rgba(79, 110, 247, 0.28);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+    html[data-theme="clean"] .nav-tab { color: #5b6472; }
+    /* 玻璃卡片：纯白实底 + 细灰描边 + 轻阴影 */
+    html[data-theme="clean"] .glass-card,
+    html[data-theme="clean"] .adm-group {
+      background: #ffffff;
+      border: 1px solid #e6e8ec;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+    html[data-theme="clean"] .glass-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(79, 110, 247, 0.45);
+      box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
+    }
+    html[data-theme="clean"] .card-title { color: #1f2430; }
+    /* 按钮：主按钮纯品牌色（去渐变），幽灵按钮白底细边 */
+    html[data-theme="clean"] .btn-primary {
+      background: #4f6ef7;
+      box-shadow: 0 4px 12px rgba(79, 110, 247, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+    html[data-theme="clean"] .btn-primary:hover { background: #4162f0; }
+    html[data-theme="clean"] .btn-ghost {
+      background: #ffffff;
+      border: 1px solid #dfe3ea;
+      color: #374151;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    }
+    html[data-theme="clean"] .btn-ghost:hover { background: #f6f8fb; border-color: rgba(79, 110, 247, 0.5); color: var(--primary); }
+    html[data-theme="clean"] .btn-danger { background: #ef4444; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2); }
+    /* 输入控件：白底细边 */
+    html[data-theme="clean"] textarea,
+    html[data-theme="clean"] input[type=text],
+    html[data-theme="clean"] input[type=password],
+    html[data-theme="clean"] .glass-input,
+    html[data-theme="clean"] .glass-select,
+    html[data-theme="clean"] .mini-select,
+    html[data-theme="clean"] .field select {
+      background: #ffffff;
+      border: 1px solid #dcdfe6;
+      color: #16181d;
+    }
+    html[data-theme="clean"] textarea:focus,
+    html[data-theme="clean"] input[type=text]:focus,
+    html[data-theme="clean"] input[type=password]:focus,
+    html[data-theme="clean"] .glass-input:focus,
+    html[data-theme="clean"] .glass-select:focus {
+      background: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(79, 110, 247, 0.12);
+    }
+    /* 标签 chip / 场景卡 / 模型卡：白底细边，激活态纯品牌色 */
+    html[data-theme="clean"] .chip,
+    html[data-theme="clean"] .scene-card,
+    html[data-theme="clean"] .mcard,
+    html[data-theme="clean"] .drop {
+      background: #ffffff;
+      border-color: #dcdfe6;
+      color: #374151;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    }
+    html[data-theme="clean"] .chip:hover,
+    html[data-theme="clean"] .scene-card:hover,
+    html[data-theme="clean"] .mcard:hover { background: #f8faff; border-color: rgba(79, 110, 247, 0.5); }
+    html[data-theme="clean"] .chip.active,
+    html[data-theme="clean"] .scene-card.active,
+    html[data-theme="clean"] .mcard.active,
+    html[data-theme="clean"] .adm-nav-item.active,
+    html[data-theme="clean"] .modal-tabs button.active {
+      background: #4f6ef7;
+      border-color: transparent;
+      box-shadow: 0 4px 12px rgba(79, 110, 247, 0.22);
+    }
+    html[data-theme="clean"] .adm-nav-item:hover { background: rgba(79, 110, 247, 0.08); }
+    /* 图片墙 / 统计卡 / 缩略图：白底细边 */
+    html[data-theme="clean"] .item,
+    html[data-theme="clean"] .stat,
+    html[data-theme="clean"] .upthumb {
+      background: #ffffff;
+      border: 1px solid #e6e8ec;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+    html[data-theme="clean"] .item:hover { box-shadow: 0 10px 22px rgba(16, 24, 40, 0.1); }
+    html[data-theme="clean"] .pair img,
+    html[data-theme="clean"] .thumb,
+    html[data-theme="clean"] .placeholder { background: #f1f3f6; }
+    html[data-theme="clean"] .stat .n {
+      background: linear-gradient(135deg, #1f2430 30%, #3d5be5);
+    }
+    /* 模态：遮罩极淡、卡片纯白（让清爽底色透出来） */
+    html[data-theme="clean"] .modal-overlay { background: rgba(40, 50, 70, 0.06); }
+    html[data-theme="clean"] .modal-card {
+      background: #ffffff;
+      border: 1px solid #e6e8ec;
+      box-shadow: 0 24px 60px rgba(16, 24, 40, 0.18);
+    }
+    html[data-theme="clean"] .modal-tabs button {
+      background: #ffffff; border: 1px solid #dcdfe6; color: #5b6472;
+    }
+    /* 表格分隔与 hover */
+    html[data-theme="clean"] th, html[data-theme="clean"] td { border-bottom-color: #eef0f3; }
+    html[data-theme="clean"] tbody tr:hover { background: #f7f9fc; }
+    /* 提示/摘要信息条：极浅品牌色调 */
+    html[data-theme="clean"] .model-desc,
+    html[data-theme="clean"] .task-prompt,
+    html[data-theme="clean"] .summary-box {
+      background: rgba(79, 110, 247, 0.05);
+      border-color: rgba(79, 110, 247, 0.18);
+    }
+    html[data-theme="clean"] .pb-head > span:first-child,
+    html[data-theme="clean"] .set-label,
+    html[data-theme="clean"] .form-row > span,
+    html[data-theme="clean"] .field-label,
+    html[data-theme="clean"] .pg-title,
+    html[data-theme="clean"] .key-guide .kg-title { color: #1f2430; }
+    html[data-theme="clean"] .sum-line { color: #4b5563; }
+    html[data-theme="clean"] .sum-line b { color: #16181d; }
+    html[data-theme="clean"] .step-no { background: #4f6ef7; box-shadow: 0 3px 8px rgba(79, 110, 247, 0.24); }
+    html[data-theme="clean"] .task-id { color: #1f2430; }
+    html[data-theme="clean"] .progress { background: #edf0f4; }
+    html[data-theme="clean"] .drop { border-color: #c3cad6; background: #fbfcfe; }
+    html[data-theme="clean"] .drop:hover, html[data-theme="clean"] .drop.dragover { border-color: var(--primary); background: rgba(79,110,247,.05); }
+    html[data-theme="clean"] .drop strong { color: #374151; }
+    html[data-theme="clean"] .prompt-box, html[data-theme="clean"] details.adv { border-top-color: #e6e8ec; }
+    html[data-theme="clean"] .scene-card.active .sc-sum,
+    html[data-theme="clean"] .scene-card.active .sc-name,
+    html[data-theme="clean"] .mcard.active .mc-meta { color: rgba(255,255,255,.9); }
+    html[data-theme="clean"] .key-guide { background: rgba(79,110,247,.05); border-color: rgba(79,110,247,.3); }
+    html[data-theme="clean"] #adminImgTable .cell-thumb { background: #eef0f4; border-color: #e2e5ea; }
+
+    /* ====================================================================
+       15. 主题切换按钮（右上角，☀️ 默认玻璃 / 🌙 简洁主题）
+       ==================================================================== */
+    .theme-toggle {
+      width: 34px; height: 34px; flex: none; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      appearance: none; cursor: pointer; font-family: inherit; font-size: 16px; line-height: 1;
+      background: rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      transition: transform .22s var(--spring), box-shadow .22s var(--spring), background .22s var(--spring), border-color .22s;
+    }
+    .theme-toggle:hover { transform: translateY(-1px) rotate(12deg); box-shadow: 0 8px 18px rgba(79, 110, 247, 0.28); border-color: rgba(79, 110, 247, 0.5); }
+    .theme-toggle:active { transform: translateY(0) scale(0.94); }
+    html[data-theme="clean"] .theme-toggle {
+      background: #ffffff;
+      border: 1px solid #dcdfe6;
+      box-shadow: 0 2px 8px rgba(16, 24, 40, 0.08);
+    }
+    @media (max-width: 860px) { .theme-toggle { width: 32px; height: 32px; font-size: 15px; } }
   </style>
 </head>
 <body>
@@ -742,8 +1013,9 @@
       <button id="navAdmin" class="nav-tab hidden" onclick="showTab('admin')"><span class="nt-ico">⚙️</span><span>管理后台</span></button>
     </div>
     <div class="top-right">
+      <button type="button" id="themeToggle" class="theme-toggle" onclick="toggleTheme()" title="切换主题" aria-label="切换主题">☀️</button>
       <div id="userBox" class="top-user-box"></div>
-      <a class="gh-star" href="https://github.com/sean198604/batch-product-studio" target="_blank" rel="noopener" title="喜欢这个工具？去 GitHub 点个 Star ⭐">⭐ Star</a>
+      <a class="gh-star" href="https://github.com/sean198604/batch-product-studio" target="_blank" rel="noopener" title="喜欢这个工具？去 GitHub 点个 Star ⭐"><span class="gh-icon">⭐</span><span class="gh-text">Star</span></a>
     </div>
   </header>
 
@@ -1480,12 +1752,102 @@ function renderSceneLibrary(){
       '<div class="sc-name">' + s.name + '</div>' +
       '<div class="sc-sum">' + (s.summary||"") + '</div>' +
       '<div class="sc-check">✓</div>';
-    b.title = s.summary || s.name;
+    b.title = ""; // 关闭浏览器原生 title，统一用自建浮层
+    if (s.tooltip) b.setAttribute("data-tip", s.tooltip);
+    bindSceneTip(b);
     b.onclick = ()=>selectScene(s);
     grid.appendChild(b);
   });
   renderRecentScenes();
 }
+
+/* ====================================================================
+   场景卡片 hover/focus tooltip 浮层
+   - 桌面：mouseenter/mouseleave/mousemove
+   - 键盘：focusin/focusout（卡片 <button> 自带 Tab 可达性）
+   - 移动端（hover:none）：长按 ~0.4s 显示，再点其它区域关闭
+   - ESC 关闭 / 滚动关闭 / 窗口 resize 关闭
+   - 自动避让屏幕边缘 + 翻转箭头方向
+   ==================================================================== */
+const SCENE_TIP = (function initTip() {
+    const el = document.createElement("div");
+    el.className = "scene-tip";
+    el.setAttribute("role", "tooltip");
+    document.body.appendChild(el);
+    return el;
+})();
+
+let _tipHideTimer = 0;
+function _tipShow(text, anchor){
+    if (!text) return;
+    SCENE_TIP.textContent = text;
+    SCENE_TIP.classList.add("show");
+    _tipPlace(anchor);
+    clearTimeout(_tipHideTimer);
+}
+function _tipHide(){
+    clearTimeout(_tipHideTimer);
+    _tipHideTimer = setTimeout(()=>SCENE_TIP.classList.remove("show"), 60);
+}
+function _tipPlace(anchor){
+    const rect = anchor.getBoundingClientRect();
+    const tip = SCENE_TIP;
+    // 先放到屏幕外测量真实尺寸
+    tip.style.left = "0px"; tip.style.top = "0px";
+    const tW = tip.offsetWidth, tH = tip.offsetHeight;
+    const margin = 10;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    // 优先放在卡片下方（不遮卡片），若下方空间不足则放上方
+    let arrow = "top"; // 箭头在浮层顶部 → 指向下方
+    let y = rect.bottom + 8;
+    if (y + tH > vh - margin){
+        y = rect.top - tH - 8;
+        arrow = "bottom"; // 箭头在浮层底部 → 指向上方
+        if (y < margin){ y = Math.min(vh - tH - margin, rect.bottom + 8); arrow = "top"; }
+    }
+    // x 居中对齐卡片，溢出时贴边
+    let x = rect.left + rect.width / 2 - tW / 2;
+    if (x < margin) x = margin;
+    if (x + tW > vw - margin) x = vw - tW - margin;
+    tip.style.left = x + "px";
+    tip.style.top  = y + "px";
+    tip.setAttribute("data-arrow", arrow);
+}
+
+// 长按检测（移动端）
+function _bindLongPress(el, getText){
+    let timer = 0, fired = false;
+    const start = ()=>{
+        fired = false;
+        clearTimeout(timer);
+        timer = setTimeout(()=>{ fired = true; _tipShow(getText(), el); }, 380);
+    };
+    const cancel = ()=>{ clearTimeout(timer); if (fired) _tipHide(); };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchend",   cancel);
+    el.addEventListener("touchmove",  cancel);
+    el.addEventListener("touchcancel",cancel);
+}
+
+function bindSceneTip(card){
+    const getText = ()=>card.getAttribute("data-tip") || "";
+    // 鼠标：进入/离开
+    card.addEventListener("mouseenter", ()=>_tipShow(getText(), card));
+    card.addEventListener("mouseleave", _tipHide);
+    // 键盘：聚焦时显示，ESC/失焦时关闭
+    card.addEventListener("focus", ()=>_tipShow(getText(), card));
+    card.addEventListener("blur",  _tipHide);
+    card.addEventListener("keydown", (e)=>{ if (e.key === "Escape") _tipHide(); });
+    // 移动端长按
+    _bindLongPress(card, getText);
+}
+
+// 全局：滚动/resize/外部点击时关闭
+window.addEventListener("scroll", _tipHide, true);
+window.addEventListener("resize", _tipHide);
+document.addEventListener("click", (e)=>{
+    if (SCENE_TIP.classList.contains("show") && !e.target.closest(".scene-tip")) _tipHide();
+});
 function selectSceneByKey(key){
   const s = SCENE_LIBRARY.find(x=>x.key===key);
   if(s) selectScene(s);
@@ -2508,6 +2870,29 @@ async function delRegCode(id){
 /* 轮询：控制台仅轮询「当前任务」进度，历史列表在「我的历史」页按需加载 */
 let pollTimer=null;
 function startPolling(){ if(pollTimer) clearInterval(pollTimer); pollTimer=setInterval(()=>{ if(!document.getElementById("tabConsole").classList.contains("hidden")){ pollCurrentTask(); } }, 3000); }
+
+/* ============ 主题切换：html[data-theme] = glass(默认液态) | clean(简洁) ============ */
+function themeNow(){
+  return document.documentElement.getAttribute("data-theme") === "clean" ? "clean" : "glass";
+}
+function toggleTheme(){
+  const next = themeNow() === "clean" ? "glass" : "clean";
+  if(next === "clean") document.documentElement.setAttribute("data-theme", "clean");
+  else document.documentElement.removeAttribute("data-theme");
+  try { localStorage.setItem("bps_theme", next); } catch(e){}
+  syncThemeBtn();
+  const msg = next === "clean" ? "已切换为简洁主题" : "已切换为默认玻璃主题";
+  showToast?.(msg);
+}
+function syncThemeBtn(){
+  const btn = document.getElementById("themeToggle");
+  if(!btn) return;
+  const clean = themeNow() === "clean";
+  btn.textContent = clean ? "🌙" : "☀️";
+  btn.title = clean ? "切换为默认玻璃主题" : "切换为简洁主题";
+  btn.setAttribute("aria-label", btn.title);
+}
+syncThemeBtn();
 
 /* 启动 */
 if(getToken()){ enterApp(); }

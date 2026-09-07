@@ -273,6 +273,7 @@ class TaskDetail(SQLModel):
     env: Optional[str] = None
     is_white_bg: bool = False
     mode: Optional[str] = None
+    ratio: Optional[str] = None
     cost_usd: float = 0.0
 
 
@@ -292,6 +293,7 @@ class TaskSummary(SQLModel):
     env: Optional[str] = None
     is_white_bg: bool = False
     mode: Optional[str] = None
+    ratio: Optional[str] = None
     cost_usd: float = 0.0
     username: Optional[str] = None  # populated for admin "all tasks" view
 
@@ -310,6 +312,7 @@ class HistoryTask(SQLModel):
     model: Optional[str] = None
     is_white_bg: bool = False
     mode: Optional[str] = None
+    ratio: Optional[str] = None
     cost_usd: float = 0.0
     items: List[ItemOut] = []
 

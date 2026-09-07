@@ -130,6 +130,7 @@ def _summary(task: GenerationTask, username: str | None = None) -> TaskSummary:
         env=task.env,
         is_white_bg=bool(task.is_white_bg),
         mode=task.mode,
+        ratio=task.ratio,
         cost_usd=task.cost_usd or 0.0,
     )
 
@@ -151,6 +152,7 @@ async def _history_task(session, task: GenerationTask) -> "HistoryTask":
         model=task.model,
         is_white_bg=bool(task.is_white_bg),
         mode=task.mode,
+        ratio=task.ratio,
         cost_usd=task.cost_usd or 0.0,
         items=await _build_item_outs(session, task.id),
     )
@@ -177,12 +179,15 @@ async def create_task(
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
     # ---- 磁盘容量闸门：占用已达上限时拒绝新上传，避免打满磁盘 ----
-    has_room, ratio = storage_maintenance.storage_has_room()
+    # 注意：storage_has_room() 第二个返回值是「存储占用比例(0.0~1.0)」，务必用独立
+    # 变量名 storage_ratio，绝不能覆盖上面的表单参数 ratio（比例字符串），否则会把
+    # 浮点数(如 0.000565)写进 GenerationTask.ratio，导致 Agnes 收到非法 ratio 而 400。
+    has_room, storage_ratio = storage_maintenance.storage_has_room()
     if not has_room:
         raise HTTPException(
             status_code=507,
             detail=(
-                f"服务器图片存储已满（{ratio:.0%}），暂时无法创建新任务。"
+                f"服务器图片存储已满（{storage_ratio:.0%}），暂时无法创建新任务。"
                 "请联系管理员清理历史任务或扩充磁盘后再试。"
             ),
         )
@@ -385,6 +390,7 @@ async def get_task(
         env=task.env,
         is_white_bg=bool(task.is_white_bg),
         mode=task.mode,
+        ratio=task.ratio,
         cost_usd=task.cost_usd or 0.0,
     )
 

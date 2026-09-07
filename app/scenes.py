@@ -57,7 +57,7 @@ _SHARED_STYLES: tuple[str, ...] = (
     "commercial product photography",
     "high-end editorial style",
     "octane render clean details",
-    "photorealistic, 8k resolution",
+    "photorealistic, ultra-high resolution",
 )
 
 

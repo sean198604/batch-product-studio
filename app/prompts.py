@@ -69,7 +69,7 @@ PHYSICS_LOCK_WHITE: str = (
 QUALITY_RENDER: str = (
     "Professional commercial advertising photography, balanced natural "
     "reflections matching the surrounding environment, hyper-realistic "
-    "textures, clean optical depth of field, 8k resolution."
+    "textures, clean optical depth of field, ultra-high resolution."
 )
 
 # --- Layer 4（纯白底模式）：高反差棚拍、锐利边缘、电商目录标准 ---
