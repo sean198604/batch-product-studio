@@ -250,7 +250,8 @@ async def create_task(
     # 多角度合成模式使用专用 Layer1（多参考图理解 3D 结构并融合成单张场景）。
     # 选定主题时额外注入「居中构图锁 + 主题氛围约束」层（位于 Layer2 之后）。
     full_prompt = assemble_prompt(
-        prompt, white_bg=is_white_bg, multi_angle=is_fusion, theme=theme
+        prompt, white_bg=is_white_bg, multi_angle=is_fusion, theme=theme,
+        ratio=ratio,
     )
 
     task = GenerationTask(

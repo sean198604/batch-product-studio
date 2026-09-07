@@ -67,6 +67,14 @@ RPM_MATRIX: dict[str, dict[str, tuple[int, int]]] = {
 VALID_USER_TIERS = ("default", "enterprise", "tokenplan")
 VALID_SIZE_TIERS = ("1K", "2K", "3K", "4K")
 
+# Agnes /images/generations API 接受的 ratio 白名单（2026-08 官方文档）。
+# 任何不在此集合的值 Agnes 会回 HTTP 400 "ratio has invalid value"。
+# "" / None 表示「原图比例」，调用时不发送 ratio 字段（让上游自己按上传图比例出图）。
+ALLOWED_AGNES_RATIOS = frozenset({
+    "1:1", "3:4", "4:3", "16:9", "9:16",
+    "2:3", "3:2", "21:9",
+})
+
 
 class _TokenBucket:
     """Async token bucket that enforces (allowed, actual) RPM.
@@ -233,10 +241,18 @@ class AgnesClient:
             "size": size,
             "extra_body": extra_body,
         }
-        # Only send ratio when the user picked a concrete aspect (otherwise
-        # Agnes falls back to its default, preserving "原图比例" semantics).
-        if ratio:
+        # Only send ratio when the user picked a concrete aspect that Agnes
+        # actually accepts (otherwise Agnes returns 400 "ratio has invalid
+        # value"). Anything outside ALLOWED_AGNES_RATIOS — including the
+        # frontend's "" sentinel for "原图比例" — falls through and Agnes uses
+        # its default (matches uploaded-image) aspect.
+        ratio = (ratio or "").strip()
+        if ratio and ratio in ALLOWED_AGNES_RATIOS:
             payload["ratio"] = ratio
+        elif ratio:
+            logger.warning(
+                "Agnes 不支持 ratio=%r，已降级为原图比例（不发送 ratio 字段）", ratio
+            )
         return payload
 
     def _headers(self, api_key: str | None = None) -> dict:

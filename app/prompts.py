@@ -109,11 +109,32 @@ def is_white_bg_prompt(user_prompt: str) -> bool:
     return any(marker in text for marker in _WHITE_BG_MARKERS)
 
 
+def _strip_ratio_phrase(text: str, ratio_prompts: dict) -> str:
+    """Remove any trailing ratio phrase left over from a previous preset / chip.
+
+    Used so the ``ratio`` argument (the authoritative one) wins no matter what
+    the user typed or what the previous scene / chip injected. Only matches a
+    phrase that sits at the *very end* of the text (the same way the frontend
+    writes it via `applyRatioToPrompt`), so we never trim mid-paragraph content.
+    """
+    out = (text or "").rstrip()
+    changed = True
+    while changed:
+        changed = False
+        for key in ratio_prompts:
+            ph = (ratio_prompts.get(key) or "").strip()
+            if ph and out.endswith(ph):
+                out = out[: len(out) - len(ph)].rstrip()
+                changed = True
+    return out
+
+
 def assemble_prompt(
     user_prompt: str,
     white_bg: bool | None = None,
     multi_angle: bool = False,
     theme: str | None = None,
+    ratio: str | None = None,
 ) -> str:
     """Wrap a user scene description into the strict 4-layer prompt.
 
@@ -142,6 +163,15 @@ def assemble_prompt(
     layer -- see ``app.scenes.theme_layer`` -- right after Layer 2, so the
     centering lock and the theme atmosphere are enforced as hard constraints
     rather than depending on what the staff typed.
+
+    ``ratio`` (e.g. "4:3", "1:1", "16:9"; ``""`` or ``None`` = original
+    aspect ratio) is the authoritative aspect ratio for the run. We always
+    sync it into Layer 3 by stripping any leftover ratio phrase from the
+    user's text and appending the canonical one. This way:
+      * if the frontend wrote the correct phrase, it stays untouched;
+      * if the user accidentally deleted the phrase, we put it back;
+      * if the user switched to "原图比例" mid-edit, the old ratio phrase is
+        cleared so it does not contradict the (now empty) ``ratio`` arg.
     """
     if white_bg is None:
         white_bg = is_white_bg_prompt(user_prompt)
@@ -150,6 +180,14 @@ def assemble_prompt(
     layer1 = FUSION_LAYER1 if multi_angle else FIDELITY_LOCK
     layer2 = PHYSICS_LOCK_WHITE if white_bg else PHYSICS_LOCK
     layer4 = QUALITY_RENDER_WHITE if white_bg else QUALITY_RENDER
+
+    # 同步比例：ratio 是权威参数 → 剥掉残留短语 + 按当前 ratio 拼正确短语。
+    from app.presets import RATIO_PROMPTS, ratio_prompt
+    user_prompt = _strip_ratio_phrase(user_prompt, RATIO_PROMPTS)
+    rp = (ratio_prompt(ratio) if ratio else "").strip()
+    if rp:
+        user_prompt = (user_prompt + "\n\n" + rp).strip() if user_prompt else rp
+
     parts = [layer1, layer2]
     # 主题构图层（居中锁 + 节日/季节氛围约束），仅在选定主题时注入
     tl = theme_layer(theme)

@@ -39,6 +39,9 @@ class ModelPrice:
     description: str = ""        # 适用场景与推荐使用时机
     note: str = ""
     provider: str = "gemini"     # gemini | agnes，前端据此分组 / 走不同客户端
+    brand: str = ""              # 前端卡片左上的圆形品牌色（"purple|pink|blue|cyan|amber|emerald" 之一）
+    icon_letter: str = ""        # 圆形品牌图标的字母（保留字段供扩展使用；当前前端不渲染，避免抓版本号数字变成无意义字符）
+    speed_hint: str = ""         # 速度文案（如 "~10s/张"），用于卡片底行展示
 
     @property
     def unit_price_usd(self) -> float | None:
@@ -66,6 +69,7 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         output_tokens_1k=1120,
         tag="⚡ 极速预览 / 低消耗",
         description="大批量初筛构图、快速验证提示词效果，延迟极低，最省额度。",
+        brand="amber", icon_letter="", speed_hint="~6s/张",
     ),
     "gemini-2.5-flash-image": ModelPrice(
         id="gemini-2.5-flash-image",
@@ -75,6 +79,7 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         output_tokens_1k=1290,
         tag="⚖️ 稳定基准（默认推荐）",
         description="日常主力模型，兼顾产品保真度与出图速度，性价比均衡。",
+        brand="amber", icon_letter="", speed_hint="~10s/张",
     ),
     "gemini-3.1-flash-image": ModelPrice(
         id="gemini-3.1-flash-image",
@@ -84,6 +89,7 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         output_tokens_1k=1120,
         tag="🚀 高保真复杂场景",
         description="针对结构复杂、带有微小文字/Logo、或需要精细光线反射的多模态融合任务。",
+        brand="amber", icon_letter="", speed_hint="~14s/张",
     ),
     "imagen-3.0-generate-002": ModelPrice(
         id="imagen-3.0-generate-002",
@@ -94,6 +100,7 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         tag="💎 商业广告级渲染",
         description="电商大促主图、宣传海报渲染，画质与物理光影质感最顶，生成耗时相对较长。",
         note="已弃用，官方定价页已无此模型，按 $0 计（不计费）。",
+        brand="emerald", icon_letter="", speed_hint="~20s/张",
     ),
     # ---- Agnes AI 图生图（国内 .cn 节点，当前官方免费 $0）----
     # 与 Gemini 同为图生图：1 输入图 + 1 输出图。免费，故单价记为 None。
@@ -108,6 +115,7 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         tag="🆓 Agnes 图生图（编辑保真强）",
         description="Agnes AI 图生图（agnes-image-2.0-flash），经国内 .cn 节点调用，当前免费。AA 图像编辑榜 ELO 1184（Top 20），擅长局部修图 / 换背景 / 原图微调，最大限度保留原图结构与构图，适合高保真产品图转场景。",
         note="官方当前免费（$0），本次生成不计费；RPM 按分辨率档：1K≈20 / 2K≈10 / 3K·4K≈1。",
+        brand="cyan", icon_letter="", speed_hint="~12s/张",
     ),
     "agnes-image-2.1-flash": ModelPrice(
         id="agnes-image-2.1-flash",
@@ -119,6 +127,7 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         tag="🆓 Agnes 免费图生图",
         description="Agnes AI 图生图（agnes-image-2.1-flash），经国内 .cn 节点调用，当前免费。适合白底产品图转场景图、多角度融合，速度与 Gemini 2.5 Flash 相当。",
         note="官方当前免费（$0），本次生成不计费；RPM 按分辨率档：1K≈20 / 2K≈10 / 3K·4K≈1。",
+        brand="blue", icon_letter="", speed_hint="~10s/张",
     ),
     "agnes-image-2.5-flash": ModelPrice(
         id="agnes-image-2.5-flash",
@@ -130,6 +139,7 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         tag="🆓 Agnes 高质图生图",
         description="Agnes AI 图生图旗舰（agnes-image-2.5-flash），质量优于 2.1，经国内 .cn 节点调用，当前免费。推荐用于结构复杂、含微小文字/Logo 的高质量场景渲染。",
         note="官方当前免费（$0），本次生成不计费；RPM 按分辨率档：1K≈20 / 2K≈10 / 3K·4K≈1。",
+        brand="purple", icon_letter="", speed_hint="~14s/张",
     ),
 }
 
@@ -165,6 +175,9 @@ def catalog() -> list[dict]:
                 "unit_price_usd": p.unit_price_usd,
                 "unit_price_cny": p.unit_price_cny,
                 "note": p.note,
+                "brand": p.brand,
+                "icon_letter": p.icon_letter,
+                "speed_hint": p.speed_hint,
             }
         )
     return out

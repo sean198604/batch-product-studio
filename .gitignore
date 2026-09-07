@@ -21,3 +21,7 @@ _export_test/
 # Local screenshot capture script (one-off dev tool, regenerates docs/screenshots/)
 docs/_shot.js
 
+# Local puppeteer / playwright dev/diagnostic scripts
+# (hardcode local Windows paths, admin password, local Chrome executable)
+scripts/
+

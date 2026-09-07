@@ -79,6 +79,25 @@ app.include_router(profile.router)
 app.include_router(tasks.router)
 app.include_router(admin.router)
 
+
+@app.middleware("http")
+async def no_cache_html(request, call_next):
+    """单文件 SPA：任何 text/html 响应都禁止缓存。
+
+    背景：index.html 之前只有 ETag / Last-Modified，无 Cache-Control，
+    其他设备的浏览器会长期复用旧缓存的 HTML（用户在其他设备一直看到
+    旧版模型卡片的根因）。这里强制 no-store，保证所有设备每次刷新
+    都从服务端拉最新 HTML（~170KB，企业内网开销可忽略）。
+    """
+    response = await call_next(request)
+    ct = response.headers.get("content-type", "")
+    if ct.startswith("text/html"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 # Generated images + originals are served under /storage.
 app.mount("/storage", StaticFiles(directory=settings.storage_dir), name="storage")
 # Frontend assets under /static (index.html also served at "/").
