@@ -367,7 +367,11 @@ async def _process(item_id: str) -> None:
                 # re-encoded to a clean PNG first so a malformed / oddly-encoded
                 # source can't trigger Google's "Unable to process input image".
                 multi = (task.mode == "multi_angle_fusion")
-                use_agnes = bool(task.model) and task.model.startswith("agnes-")
+                # model 为空 = 使用后台默认模型（settings 的 gemini_model 字段，
+                # 存的是实际默认模型名，可能是 agnes-*）。路由必须按「最终生效的
+                # 模型名」判断前缀，否则 model=None 的任务会被误发到 Gemini 而 404。
+                eff_model = (task.model or "").strip() or settings_store.get_model() or ""
+                use_agnes = eff_model.startswith("agnes-")
                 if use_agnes:
                     # Agnes 图生图：单图与多角度合成都合并进 extra_body.image。
                     # 解析本次生成使用的池 Key：自有（不限量）-> 系统 Key -> 池内轮换。
@@ -392,7 +396,7 @@ async def _process(item_id: str) -> None:
                         image_bytes, mime = await _agnes_client.generate(
                             prompt_to_send,
                             api_images,
-                            model=task.model,
+                            model=eff_model,
                             size=settings_store.get_agnes_size_tier(),
                             ratio=task.ratio or "",
                             api_key=agnes_api_key,
@@ -417,7 +421,7 @@ async def _process(item_id: str) -> None:
                     prompt_to_send = _build_prompt(task, multi)
                     try:
                         image_bytes, mime = await _client.generate_image_multi(
-                            prompt_to_send, api_images, model=task.model
+                            prompt_to_send, api_images, model=eff_model
                         )
                     finally:
                         for ai in api_images:
@@ -431,7 +435,7 @@ async def _process(item_id: str) -> None:
                     prompt_to_send = _build_prompt(task, multi)
                     try:
                         image_bytes, mime = await _client.generate_image(
-                            prompt_to_send, api_image, model=task.model
+                            prompt_to_send, api_image, model=eff_model
                         )
                     finally:
                         if api_image != _abs(item.original_path) and os.path.exists(api_image):
@@ -450,7 +454,7 @@ async def _process(item_id: str) -> None:
             item.status = "success"
             item.error_message = None
             # 图生图单价：按本任务所用模型计算单张成本（含 1 输入图 + 1 输出图）。
-            cost = pricing.compute_cost_usd(task.model)
+            cost = pricing.compute_cost_usd(eff_model)
             item.cost_usd = cost
             task.completed_count += 1
             task.cost_usd = (task.cost_usd or 0.0) + cost

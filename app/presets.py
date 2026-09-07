@@ -312,7 +312,7 @@ def find_scene(key: str) -> ScenePreset | None:
 # 输出比例
 # --------------------------------------------------------------------------- #
 RATIOS: tuple[dict, ...] = (
-    {"value": "", "label": "原图比例", "hint": "跟随上传原图，不额外扩展场景"},
+    {"value": "", "label": "原图比例", "hint": "画布自动匹配产品原图宽高比（如 4:3 原图→4:3 输出），产品不会被拉伸/压缩"},
     {"value": "4:3", "label": "4:3 横", "hint": "电商详情页通用横向构图"},
     {"value": "1:1", "label": "1:1 正方", "hint": "平台主图 / 社媒方形"},
     {"value": "3:4", "label": "3:4 竖", "hint": "详情页竖图 / 小红书"},
@@ -332,6 +332,50 @@ RATIO_PROMPTS: dict[str, str] = {
 
 def ratio_prompt(value: str | None) -> str:
     return RATIO_PROMPTS.get((value or "").strip(), "")
+
+
+# --------------------------------------------------------------------------- #
+# 「原图比例」→ 上游可接受 ratio 的几何映射
+# --------------------------------------------------------------------------- #
+# value -> 宽高比 w/h。覆盖 Agnes /images/generations 全部白名单（含前端未直接
+# 暴露的 2:3 / 3:2 / 21:9），保证任意比例的输入图都能映射到几何最接近的档位。
+RATIO_ASPECT: dict[str, float] = {
+    "1:1": 1.0,
+    "3:4": 0.75,
+    "4:3": 4.0 / 3.0,
+    "16:9": 16.0 / 9.0,
+    "9:16": 9.0 / 16.0,
+    "2:3": 2.0 / 3.0,
+    "3:2": 3.0 / 2.0,
+    "21:9": 21.0 / 9.0,
+}
+
+
+def nearest_ratio(value: str | None, img_w: int, img_h: int) -> str | None:
+    """把一个可选比例值规范化为上游可接受的 ratio 字符串。
+
+    * ``value`` 是合法白名单值 -> 原样返回（用户显式选择优先）；
+    * ``value`` 为空（=「原图比例」）-> 按输入图真实宽高比，映射到
+      ``RATIO_ASPECT`` 中相对误差最小的一项（横/竖对称，不会把竖图误判成横图）；
+    * 其它情况（非法值 / 无有效尺寸）-> 返回 ``None``，由调用方决定兜底。
+
+    背景：Agnes 的 ratio 参数**缺省是 1:1**（官方文档 Default is 1:1），不是
+    「跟随原图比例」。若空值直接不发送 ratio 字段，任何非方形输入图都会被硬拉到
+    1:1 方形画布重绘 -> 产品被拉伸/压缩（忽胖忽瘦）。本函数让「原图比例」真正
+    等价于「画布比例 = 产品原图比例」，从几何上消除变形。
+    """
+    v = (value or "").strip()
+    if v in RATIO_ASPECT:
+        return v
+    if not v and img_w > 0 and img_h > 0:
+        ar = img_w / img_h
+        best, best_err = "1:1", abs(1.0 - ar)
+        for r, g in RATIO_ASPECT.items():
+            err = abs(ar - g) / g  # 相对误差，横图与竖图度量对称
+            if err < best_err:
+                best, best_err = r, err
+        return best
+    return None
 
 
 # --------------------------------------------------------------------------- #

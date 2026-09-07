@@ -70,6 +70,34 @@ def _assert_owner_or_admin(task: GenerationTask, user: User) -> None:
         raise HTTPException(status_code=403, detail="Not allowed to access this task.")
 
 
+def _resolve_ratio_from_upload(ratio: str | None, upload: UploadFile) -> str | None:
+    """「原图比例」解析：ratio 为空时读首张上传图真实宽高，映射到 Agnes 白名单最近档。
+
+    背景：Agnes 的 ratio 参数缺省是 1:1（官方文档 Default is 1:1），空值若直接
+    不发送 = 1:1 方形画布重绘，任何非方形产品都会被拉伸/压缩（忽胖忽瘦）。这里
+    把「原图比例」解析成输入图比例对应的白名单档位并落库 / 注入 prompt，让画布
+    比例与产品原图比例一致，从几何上消除变形。解析失败返回 None（保持原语义）。
+    """
+    if (ratio or "").strip():
+        return (ratio or "").strip()
+    try:
+        from PIL import Image
+
+        from app.presets import nearest_ratio
+
+        upload.file.seek(0)
+        with Image.open(upload.file) as im:
+            w, h = im.size
+        upload.file.seek(0)  # 复位，保证后续写盘 read() 从头开始
+        return nearest_ratio("", w, h) or None
+    except Exception:  # noqa: BLE001 —— 解析失败不阻断建任务，worker 层另有兜底
+        try:
+            upload.file.seek(0)
+        except Exception:
+            pass
+        return None
+
+
 async def _build_item_outs(session, task_id: str) -> list:
     """Build ItemOut list for a task, including multi-angle original_urls."""
     items = (
@@ -243,6 +271,10 @@ async def create_task(
     if theme and not is_valid_theme(theme):
         theme = None
 
+    # 「原图比例」解析：Agnes 的 ratio 缺省是 1:1，空值必须解析成首张上传图
+    # 的真实比例（白名单最近档）显式发送，否则非方形产品会被拉到方形画布变形。
+    effective_ratio = _resolve_ratio_from_upload(ratio, files[0])
+
     # 后端在创建任务时即把用户填写的场景提示词拼装为四层结构
     # （保真锁 + 物理防畸变 + 用户场景 + 商业画质），result 存入 full_prompt，
     # 既作为实际生图用的提示词，也用于记录展示与一键复制。
@@ -251,7 +283,7 @@ async def create_task(
     # 选定主题时额外注入「居中构图锁 + 主题氛围约束」层（位于 Layer2 之后）。
     full_prompt = assemble_prompt(
         prompt, white_bg=is_white_bg, multi_angle=is_fusion, theme=theme,
-        ratio=ratio,
+        ratio=effective_ratio,
     )
 
     task = GenerationTask(
@@ -259,7 +291,7 @@ async def create_task(
         total_count=1 if is_fusion else len(files),
         model=model or None, env=env, is_white_bg=bool(is_white_bg),
         mode="multi_angle_fusion" if is_fusion else None,
-        ratio=ratio or None, theme=theme, theme_random=bool(theme_random),
+        ratio=effective_ratio or None, theme=theme, theme_random=bool(theme_random),
     )
     session.add(task)
     await session.flush()  # populate task.id (UUID)

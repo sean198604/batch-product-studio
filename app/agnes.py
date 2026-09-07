@@ -26,6 +26,7 @@ import asyncio
 import base64
 import logging
 import mimetypes
+import os
 import time
 from typing import List, Tuple
 
@@ -241,19 +242,35 @@ class AgnesClient:
             "size": size,
             "extra_body": extra_body,
         }
-        # Only send ratio when the user picked a concrete aspect that Agnes
-        # actually accepts (otherwise Agnes returns 400 "ratio has invalid
-        # value"). Anything outside ALLOWED_AGNES_RATIOS — including the
-        # frontend's "" sentinel for "原图比例" — falls through and Agnes uses
-        # its default (matches uploaded-image) aspect.
-        ratio = (ratio or "").strip()
-        if ratio and ratio in ALLOWED_AGNES_RATIOS:
-            payload["ratio"] = ratio
-        elif ratio:
-            logger.warning(
-                "Agnes 不支持 ratio=%r，已降级为原图比例（不发送 ratio 字段）", ratio
-            )
+        # 发送给 Agnes 的 ratio 永远是白名单值 —— 绝不能让上游落到缺省 1:1。
+        # 官方文档明确 ratio 缺省 Default is 1:1（不是「跟随上传图」）；若空值
+        # 直接不发字段，任何非方形输入图都会被硬拉到 1:1 画布重绘，产品随之被
+        # 拉伸/压缩（忽胖忽瘦）。因此「原图比例」在此解析为首张输入图的真实
+        # 宽高比对应的白名单档位，显式发送。
+        payload["ratio"] = self._resolve_safe_ratio(ratio, image_paths)
         return payload
+
+    @staticmethod
+    def _resolve_safe_ratio(ratio: str, image_paths: List[str]) -> str:
+        """把请求 ratio 规范化为 Agnes 一定接受的值（兜底 1:1，绝不发送非法值）。"""
+        from app.presets import nearest_ratio
+
+        r = (ratio or "").strip()
+        if r in ALLOWED_AGNES_RATIOS:
+            return r
+        try:
+            from PIL import Image
+
+            for p in image_paths or []:
+                if p and os.path.exists(p):
+                    with Image.open(p) as im:
+                        w, h = im.size
+                    mapped = nearest_ratio("", w, h)
+                    if mapped:
+                        return mapped
+        except Exception:  # noqa: BLE001 —— 解析失败只降级，绝不能阻断生图
+            pass
+        return "1:1"
 
     def _headers(self, api_key: str | None = None) -> dict:
         key = (api_key or "").strip() or settings_store.get_agnes_key()
