@@ -71,7 +71,7 @@ CATEGORIES: tuple[dict, ...] = (
         "key": "festival",
         "label": "节日季节",
         "emoji": "🎃",
-        "description": "鬼节 / 春 / 秋，自动注入居中构图锁，主题鲜明",
+        "description": "鬼节 / 圣诞 / 复活节 / 春季 / 秋季主题，自动注入居中构图锁，主题鲜明",
     },
 )
 

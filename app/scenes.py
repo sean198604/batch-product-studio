@@ -192,8 +192,85 @@ AUTUMN = ThemePack(
 )
 
 
+# --------------------------------------------------------------------------- #
+# 🎄 圣诞节 / Christmas
+# --------------------------------------------------------------------------- #
+CHRISTMAS = ThemePack(
+    key="christmas",
+    label="🎄 圣诞节主题",
+    description="温暖、浓郁、节庆感。圣诞红与松针绿打底、金色暖光、雪花轻扬，适合圣诞季大促与礼品线主图。",
+    backgrounds=(
+        "in a cozy lodge living room beside a warmly lit Christmas tree",
+        "in a snowy pine forest at dusk dusted with fresh snow",
+        "beside a hearth mantel decked with evergreen garlands in a warm chalet hall",
+        "by a frosty window with village lights twinkling in the snowy night",
+        "in a wooden alpine hall wrapped in garlands and glowing wreaths",
+    ),
+    elements=(
+        "framed by frosted pine branches with glossy red and gold baubles",
+        "surrounded by warm twinkling fairy lights and soft golden bokeh",
+        "with evergreen sprigs and cinnamon pine cones arranged naturally around",
+        "flanked by neatly wrapped holiday gift boxes with satin ribbons",
+    ),
+    lights=(
+        "warm golden glow with rich Christmas red, deep evergreen and gold accents",
+        "cozy fireplace ambience with soft glowing highlights",
+        "crisp winter twilight blue with warm golden accent highlights",
+        "glowing fairy-light sparkle against a softly darkened festive backdrop",
+    ),
+    accent=(
+        "The scene must read instantly and unmistakably as Christmas: a festive "
+        "palette of rich red, deep evergreen and warm gold, cozy yet premium "
+        "commercial-grade. Avoid anything gaudy or kitsch, and no religious "
+        "nativity imagery. Do not add any text, letters, numbers, watermark or "
+        "logo anywhere in the scene."
+    ),
+    signature=(1, 0, 0),
+    signature_label="🎄 雪夜松林 · 红金松枝",
+    variant_label="🎲 圣诞随机变体（每张不同）",
+)
+
+# --------------------------------------------------------------------------- #
+# 🐣 复活节 / Easter
+# --------------------------------------------------------------------------- #
+EASTER = ThemePack(
+    key="easter",
+    label="🐣 复活节主题",
+    description="清新、粉彩、春意萌动。马卡龙粉彩系彩蛋、郁金香与嫩绿草地，柔和明亮，适合复活节春促与礼品线。",
+    backgrounds=(
+        "in a sunlit spring garden full of blooming tulips",
+        "on a fresh green meadow scattered with clover and daisies",
+        "on a rustic wooden table adorned with delicate spring florals",
+        "in a bright countryside yard under a blossoming magnolia tree",
+        "in a pastel-decorated spring room with soft linen and fresh flowers",
+    ),
+    elements=(
+        "with pastel Easter eggs nestled on soft green moss around it",
+        "with delicate tulips and pussy willow sprigs arranged nearby",
+        "with a woven wicker nest holding speckled pastel mini eggs",
+        "with soft satin ribbons and a gentle scattering of spring petals",
+    ),
+    lights=(
+        "soft bright pastel morning light with an airy clean palette",
+        "gentle golden spring sunshine filtered through fresh foliage",
+        "delicate dreamy backlight in pastel pink, mint, butter yellow and lilac tones",
+        "fresh diffused daylight with crisp gentle natural shadows",
+    ),
+    accent=(
+        "The scene must read instantly and unmistakably as Easter: a soft pastel "
+        "palette of pink, mint, butter yellow and lilac, with decorated eggs, "
+        "fresh spring blooms and a clean cheerful mood. Keep it premium and "
+        "family-friendly, never religious or somber. Do not add any text, "
+        "letters, numbers, watermark or logo anywhere in the scene."
+    ),
+    signature=(0, 0, 0),
+    signature_label="🌷 郁金香花园 · 彩蛋花簇",
+    variant_label="🎲 复活节随机变体（每张不同）",
+)
+
+
 THEME_PACKS: dict[str, ThemePack] = {
-    pack.key: pack for pack in (GHOST, SPRING, AUTUMN)
+    pack.key: pack for pack in (GHOST, SPRING, AUTUMN, CHRISTMAS, EASTER)
 }
 
 
