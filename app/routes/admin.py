@@ -516,12 +516,41 @@ async def dashboard_stats(
     cost_by_model = {
         (m or "unknown"): round(float(v), 6) for m, v in cost_rows
     }
+
+    # 最近 7 天每日生成图片数（趋势图用，含 0 天，避免造假）。
+    from datetime import timedelta
+    today = datetime.utcnow().date()
+    last7 = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
+    daily_rows = (
+        await session.execute(
+            select(func.date(GenerationTask.created_at), func.count(GenerationTask.id))
+            .group_by(func.date(GenerationTask.created_at))
+        )
+    ).all()
+    daily_counts = {str(d[0]): int(d[1]) for d in daily_rows}
+    daily_images = [
+        {"date": d.isoformat(), "count": daily_counts.get(d.isoformat(), 0)}
+        for d in last7
+    ]
+
+    # 各模型生成图片数（模型使用分布用）。
+    img_rows = (
+        await session.execute(
+            select(GenerationTask.model, func.count(TaskItem.id))
+            .join(TaskItem, TaskItem.task_id == GenerationTask.id)
+            .group_by(GenerationTask.model)
+        )
+    ).all()
+    images_by_model = {(m or "unknown"): int(v) for m, v in img_rows}
+
     return AdminStats(
         total_users=total_users,
         total_api_calls=int(row[0]),
         total_images_generated=int(row[1]),
         total_cost_usd=round(float(row[2]), 6),
         cost_by_model=cost_by_model,
+        daily_images=daily_images,
+        images_by_model=images_by_model,
     )
 
 

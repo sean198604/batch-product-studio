@@ -335,6 +335,16 @@
     .progress > span { display: block; height: 100%; border-radius: 999px;
       background: linear-gradient(135deg, #4f6ef7, #818cf8);
       box-shadow: 0 0 8px rgba(79, 110, 247, 0.45); transition: width .45s var(--spring); }
+    /* 进行中的 indeterminate 动画：光带从左到右循环移动，不反映真实百分比 */
+    .progress.animated > span {
+      width: 100% !important;
+      background: linear-gradient(90deg, #4f6ef7 0%, #a5b4fc 35%, #4f6ef7 70%, #3d5be5 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.3s linear infinite;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    /* placeholder 统一不要太淡 */
+    ::placeholder { color: #9ca3af; opacity: 1; }
 
     .hint { font-size: 12.5px; color: #d97706; margin: 8px 0 2px; }
 
@@ -344,6 +354,65 @@
     .task-id { font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: 0.3px; }
     .task-sub { font-size: 12px; color: var(--text-muted); }
     .task-acts { display: flex; align-items: center; margin-top: 12px; }
+
+    /* ============ 我的历史：图片图库 ============ */
+    .hist-toolbar { display: flex; align-items: center; margin: 2px 0 14px; }
+    .hist-toolbar > * + * { margin-left: 10px; }
+    .hist-search { position: relative; flex: 1; min-width: 0; }
+    .hist-search .hs-ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: .55; pointer-events: none; }
+    .hist-search input { width: 100%; height: 38px; padding: 0 14px 0 34px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.6); font-family: inherit; font-size: 14px; color: #0f172a; box-sizing: border-box; }
+    .hist-search input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79,110,247,0.14); }
+    .hist-date { height: 38px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.6); font-family: inherit; font-size: 13px; color: #334155; box-sizing: border-box; }
+
+    .hist-batchbar { display: flex; align-items: center; flex-wrap: wrap; background: rgba(79,110,247,0.08); border: 1px solid rgba(79,110,247,0.25); border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; }
+    .hist-batchbar > * + * { margin-left: 12px; }
+    .hist-selall { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; color: #334155; cursor: pointer; }
+    .hist-selall input { margin-right: 6px; }
+    .hist-selcount { font-size: 13px; font-weight: 700; color: var(--primary); }
+    .hist-batch-acts { display: flex; margin-left: auto; }
+    .hist-batch-acts > * + * { margin-left: 8px; }
+
+    .hist-count { font-size: 12.5px; color: var(--text-muted); font-weight: 600; margin: 2px 0 12px; }
+
+    /* 图库网格：桌面 5 列 / 1440 4 列 / 平板 3 列 / 手机 2 列 */
+    .gallery-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+    @media (max-width: 1600px){ .gallery-grid { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 1100px){ .gallery-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 680px){ .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
+
+    .gcard { position: relative; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; box-shadow: var(--glass-shadow); transition: transform .25s var(--spring), box-shadow .25s var(--spring), border-color .2s; }
+    .gcard:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(15,23,42,0.12); }
+    .gcard-img { position: relative; aspect-ratio: 1/1; overflow: hidden; background: #eef1f5; cursor: pointer; }
+    .gcard-img img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s var(--spring); }
+    .gcard:hover .gcard-img img { transform: scale(1.04); }
+    .gcard-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(15,23,42,0.34); opacity: 0; transition: opacity .2s; }
+    .gcard:hover .gcard-overlay { opacity: 1; }
+    .gcard-overlay > * + * { margin-left: 10px; }
+    .gcard-overlay .ob-btn { height: 32px; padding: 0 14px; border-radius: 10px; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; color: #1e293b; background: rgba(255,255,255,0.92); box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform .15s var(--spring); }
+    .gcard-overlay .ob-btn:hover { transform: translateY(-1px); }
+    .gcard-check { position: absolute; top: 8px; left: 8px; z-index: 3; width: 22px; height: 22px; cursor: pointer; opacity: 0; transition: opacity .2s; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+    .gcard:hover .gcard-check, .gallery-grid.selecting .gcard-check { opacity: 1; }
+    .gcard.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(79,110,247,0.4), var(--glass-shadow); }
+    .gcard.selected .gcard-check { opacity: 1; }
+    .gcard-info { padding: 10px 12px 12px; }
+    .gcard-meta { font-size: 11.5px; color: var(--text-muted); display: flex; flex-wrap: wrap; }
+    .gcard-meta > * { margin: 0 10px 4px 0; }
+    .gcard-prompt { font-size: 12.5px; line-height: 1.5; color: #334155; margin: 6px 0 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+    .gcard-acts { display: flex; }
+    .gcard-acts > * + * { margin-left: 8px; }
+    .gcard-acts .btn { flex: 1; height: 32px; font-size: 12.5px; }
+
+    .gallery-empty { text-align: center; padding: 60px 20px; }
+    .gallery-empty .ge-ico { font-size: 44px; line-height: 1; }
+    .gallery-empty .ge-title { font-size: 17px; font-weight: 700; color: #1e293b; margin-top: 12px; }
+    .gallery-empty .ge-sub { font-size: 13px; color: var(--text-muted); margin-top: 6px; margin-bottom: 16px; }
+
+    /* 确认对话框（复用 modal-overlay / modal-card） */
+    .confirm-card { max-width: 380px; }
+    .confirm-title { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+    .confirm-msg { font-size: 13.5px; line-height: 1.6; color: #475569; margin-bottom: 18px; }
+    .confirm-acts { display: flex; justify-content: flex-end; }
+    .confirm-acts > * + * { margin-left: 10px; }
 
     /* 图片网格（Justified 图片墙） */
     .items { display: flex; flex-wrap: wrap; width: 100%; margin-top: 14px; }
@@ -375,18 +444,91 @@
     /* ====================================================================
        9. 统计看板（玻璃卡内小卡）
        ==================================================================== */
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-    .stat {
-      background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.65);
-      border-radius: 14px; padding: 18px; text-align: center;
-      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    }
-    .stat .n {
-      font-size: 30px; font-weight: 800; letter-spacing: 0.5px;
-      /* 纯色数字：禁用渐变文字（background-clip:text 在不支持的浏览器上会整段透明，数字直接消失） */
-      color: #1e293b;
-    }
-    .stat .l { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; font-weight: 500; }
+    /* ============ 管理后台 Dashboard 重构（Modern AI SaaS） ============ */
+    /* 紧凑侧边栏 */
+    .admin-side { flex: 0 0 212px; position: sticky; top: calc(var(--header-h, 64px) + 18px); display: flex; flex-direction: column; }
+    .adm-brand { display: flex; align-items: center; gap: 9px; padding: 2px 12px 14px; }
+    .adm-brand .logo { width: 28px; height: 28px; border-radius: 9px; background: linear-gradient(135deg, #4f6ef7, #7c8dfb);
+      display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 5px 12px rgba(79,110,247,.35); }
+    .adm-brand .txt { font-weight: 800; font-size: 13px; letter-spacing: .6px; color: #0f172a; }
+    .adm-group { background: transparent; border: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; padding: 0; }
+    .adm-group + .adm-group { margin-top: 16px; }
+    .adm-group-title { font-size: 10.5px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: #94a3b8; padding: 0 12px 7px; }
+    .adm-nav-item { appearance: none; border: 0; background: transparent; cursor: pointer; font-family: inherit; width: 100%; text-align: left;
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 11px; color: #475569; font-size: 13px; font-weight: 600;
+      position: relative; transition: background .2s var(--spring), color .2s var(--spring); }
+    .adm-nav-item .adm-ico { font-size: 15px; line-height: 1; opacity: .82; width: 18px; text-align: center; }
+    .adm-nav-item:hover { background: rgba(79,110,247,.08); color: #334155; }
+    .adm-nav-item.active { background: rgba(79,110,247,.12); color: #3b53d4; }
+    .adm-nav-item.active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: #4f6ef7; }
+    .adm-nav-item.active .adm-ico { opacity: 1; }
+
+    /* Dashboard 头部工具条 */
+    .dash-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 2px 0 18px; }
+    .dash-head .dh-left { min-width: 0; }
+    .dash-head .dh-title { font-size: 22px; font-weight: 800; letter-spacing: .3px; color: #0f172a; }
+    .dash-head .dh-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; }
+    .dash-head .dh-right { display: flex; align-items: center; gap: 10px; }
+    .dash-head .dh-admin { font-size: 12.5px; color: #475569; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .dash-head .dh-admin .av { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg,#4f6ef7,#7c8dfb); color: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+
+    /* KPI 卡片（数字第一层） */
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+    .kpi { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 18px 20px;
+      box-shadow: var(--glass-shadow); position: relative; overflow: hidden; }
+    .kpi::after { content: ""; position: absolute; right: -18px; top: -18px; width: 76px; height: 76px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(79,110,247,.12), transparent 70%); }
+    .kpi .k-label { font-size: 12px; color: var(--text-muted); font-weight: 600; letter-spacing: .3px; }
+    .kpi .k-num { font-size: 34px; font-weight: 800; color: #0f172a; line-height: 1.05; margin: 9px 0 5px; letter-spacing: .5px; }
+    .kpi .k-num.accent { color: #3b53d4; }
+    .kpi .k-sub { font-size: 12px; color: #94a3b8; font-weight: 500; }
+
+    /* 模块两列布局 */
+    .dash-cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .dash-card { margin-bottom: 0; }
+
+    /* 生成趋势 Area Chart */
+    .area-chart { width: 100%; height: 200px; margin-top: 6px; }
+    .area-chart text { fill: #94a3b8; font-size: 10px; }
+    .area-chart .axis-line { stroke: #e6e8ec; stroke-width: 1; }
+
+    /* API 成本分析 */
+    .cost-total { font-size: 30px; font-weight: 800; color: #0f172a; letter-spacing: .5px; }
+    .cost-total small { font-size: 14px; color: #94a3b8; font-weight: 600; margin-left: 4px; }
+    .cost-rank { margin-top: 14px; display: flex; flex-direction: column; gap: 11px; }
+    .cost-row { display: flex; align-items: center; gap: 10px; }
+    .cost-row .cname { flex: 0 0 150px; font-size: 12px; color: #334155; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cost-bar { flex: 1; height: 9px; background: #eef1f5; border-radius: 999px; overflow: hidden; }
+    .cost-bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4f6ef7, #7c8dfb); }
+    .cost-val { flex: 0 0 auto; font-size: 12px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; }
+    .cost-empty { font-size: 12.5px; color: var(--text-muted); padding: 8px 0; }
+
+    /* 最近生成图片条 */
+    .recent-strip { display: grid; grid-template-columns: repeat(8, 1fr); gap: 12px; margin-top: 4px; }
+    .rthumb { cursor: pointer; border-radius: 12px; overflow: hidden; background: #eef1f5; border: 1px solid var(--glass-border);
+      transition: transform .2s var(--spring), box-shadow .2s; }
+    .rthumb:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(15,23,42,.14); }
+    .rthumb .ri { aspect-ratio: 1/1; overflow: hidden; }
+    .rthumb .ri img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .rthumb .rm { padding: 6px 8px; }
+    .rthumb .rm .rt { font-size: 10.5px; color: var(--text-muted); }
+    .rthumb .rm .ru { font-size: 11px; color: #334155; font-weight: 600; }
+
+    /* 快捷操作 */
+    .quick-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+    .qa { appearance: none; border: 1px solid var(--glass-border); background: var(--glass-bg); cursor: pointer; font-family: inherit;
+      display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 11px; font-size: 12.5px; font-weight: 600; color: #334155;
+      transition: border-color .2s, color .2s, background .2s; }
+    .qa:hover { border-color: #4f6ef7; color: #3b53d4; background: rgba(79,110,247,.06); }
+    .qa .ico { font-size: 14px; }
+
+    @media (max-width: 1100px){ .recent-strip { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 760px){ .kpis { grid-template-columns: repeat(2, 1fr); } .dash-cols { grid-template-columns: 1fr; } .recent-strip { grid-template-columns: repeat(3, 1fr); } }
+
+    /* 保留兼容（旧 .stats 容器不再使用） */
+    .stats { display: none; }
+    .stat { display: none; }
 
     /* 表格 */
     .table-wrap { overflow-x: auto; border-radius: 14px; }
@@ -468,6 +610,24 @@
       transition: background 0.2s var(--spring);
     }
     .lb-close:hover { background: rgba(255, 255, 255, 0.3); }
+    .lb-stage { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .lb-stage .lb-img { max-width: 100%; max-height: 86vh; }
+    .lb-side { width: 320px; flex: none; background: #fff; padding: 22px; overflow-y: auto; max-height: 92vh; box-shadow: -10px 0 30px rgba(0,0,0,0.25); }
+    .lb-side .lb-meta { font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.7; }
+    .lb-side .lb-prompt { font-size: 13px; line-height: 1.65; color: #334155; margin-bottom: 18px; white-space: pre-wrap; word-break: break-word; }
+    .lb-side .lb-acts { display: flex; }
+    .lb-side .lb-acts > * + * { margin-left: 8px; }
+    .lb-side .lb-acts .btn { flex: 1; }
+    .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; background: rgba(255,255,255,0.16); color: #fff; font-size: 26px; line-height: 1; display: flex; align-items: center; justify-content: center; transition: background .2s var(--spring); }
+    .lb-nav:hover { background: rgba(255,255,255,0.32); }
+    .lb-prev { left: 20px; }
+    .lb-next { right: 20px; }
+    @media (max-width: 760px){
+      .lightbox { flex-direction: column; }
+      .lb-stage { padding: 14px; }
+      .lb-side { width: 100%; max-height: 42vh; box-shadow: 0 -10px 30px rgba(0,0,0,0.25); }
+      .lb-nav { top: auto; bottom: 44%; }
+    }
 
     /* ====================================================================
        12. 入场动画 / 响应式 / 无障碍降级
@@ -947,10 +1107,10 @@
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
-    /* 页面底：纯白/极浅中性，去掉四角彩色渐变 */
+    /* 页面底：暖白底，彻底去掉冷灰/彩色渐变，降低长时间注视不适 */
     html[data-theme="clean"] body {
       color: var(--text-main);
-      background: #f6f7f9;
+      background: #fafafa;
     }
     /* 顶栏：白底细描边，去毛玻璃 */
     html[data-theme="clean"] .top-bar {
@@ -1029,12 +1189,21 @@
     html[data-theme="clean"] .scene-card:hover { background: #f8faff; border-color: rgba(79, 110, 247, 0.5); }
     html[data-theme="clean"] .chip.active,
     html[data-theme="clean"] .scene-card.active,
-    html[data-theme="clean"] .adm-nav-item.active,
     html[data-theme="clean"] .modal-tabs button.active {
       background: #4f6ef7;
       border-color: transparent;
       box-shadow: 0 4px 12px rgba(79, 110, 247, 0.22);
     }
+    /* 后台侧边栏 active：统一为浅色底 + 左侧指示条（不抢视觉） */
+    html[data-theme="clean"] .adm-nav-item.active {
+      background: rgba(79, 110, 247, 0.12);
+      color: #3b53d4;
+      border-color: transparent;
+      box-shadow: none;
+    }
+    html[data-theme="clean"] .kpi { background: #ffffff; border: 1px solid #e6e8ec; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+    html[data-theme="clean"] .kpi .k-num { color: #1f2430; }
+    html[data-theme="clean"] .qa { background: #ffffff; border-color: #e6e8ec; }
     html[data-theme="clean"] .adm-nav-item:hover { background: rgba(79, 110, 247, 0.08); }
     /* 图片墙 / 统计卡 / 缩略图：白底细边 */
     html[data-theme="clean"] .item,
@@ -1052,12 +1221,16 @@
       color: #1f2430;
     }
     /* 模态：遮罩极淡、卡片纯白（让清爽底色透出来） */
-    html[data-theme="clean"] .modal-overlay { background: rgba(40, 50, 70, 0.06); }
+    html[data-theme="clean"] .modal-overlay { background: rgba(0, 0, 0, 0.04); }
     html[data-theme="clean"] .modal-card {
       background: #ffffff;
       border: 1px solid #e6e8ec;
       box-shadow: 0 24px 60px rgba(16, 24, 40, 0.18);
     }
+    /* 登录/表单：标签与 placeholder 加深，避免白色卡片里文字发虚 */
+    html[data-theme="clean"] .form-row > span,
+    html[data-theme="clean"] .field-label { color: #1f2937; }
+    html[data-theme="clean"] ::placeholder { color: #9ca3af; }
     html[data-theme="clean"] .modal-tabs button {
       background: #ffffff; border: 1px solid #dcdfe6; color: #5b6472;
     }
@@ -1172,6 +1345,166 @@
     .adm-tool > * { margin: 0 8px 8px 0; }
     .flx-gap8 { margin-right: -8px; margin-bottom: -8px; }
     .flx-gap8 > * { margin: 0 8px 8px 0; }
+
+    /* ============================================================
+       移动端优先重构（批量生成控制台）
+       断点：≤1023px 单列 + 移动顶栏 + 底部固定生成；≥1024px 维持双栏（轻量优化）
+       ============================================================ */
+    #mTopBar, #stepNav, #genBar, #mMenu { display: none; }
+
+    @media (max-width: 1023px) {
+      /* —— 全局：隐藏桌面顶栏，启用移动端顶栏 —— */
+      .top-bar { display: none !important; }
+      body { overflow-x: hidden; }
+      .page-layout { padding: 0 !important; }
+      .main-content { padding: 0 !important; }
+      .ver-stamp { display: none; }
+      #tabHistory .view-head { display: none; }
+
+      /* —— 移动端顶栏（各 Tab 共用） —— */
+      #mTopBar {
+        display: flex; align-items: center; gap: 8px;
+        position: sticky; top: 0; z-index: 120;
+        height: 50px; padding: 0 10px;
+        background: var(--bg, #f8fafc);
+        border-bottom: 1px solid rgba(15,23,42,0.08);
+      }
+      html[data-theme="clean"] #mTopBar { background: #f7f8fa; }
+      #mTopBar .m-back, #mTopBar .m-more {
+        width: 40px; height: 40px; flex-shrink: 0; border: none; background: transparent;
+        color: var(--text-main); font-size: 22px; line-height: 1; cursor: pointer; border-radius: 10px;
+      }
+      #mTopBar .m-back:active, #mTopBar .m-more:active { background: rgba(15,23,42,0.06); }
+      #mTopBar .m-logo {
+        width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; background: var(--primary);
+        display: flex; align-items: center; justify-content: center; font-size: 15px;
+      }
+      #mTopBar .m-title {
+        flex: 1; min-width: 0; font-size: 15px; font-weight: 700; color: var(--text-main);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+
+      /* —— 移动端菜单（⋮ 弹出） —— */
+      #mMenu {
+        display: none; position: fixed; z-index: 200; top: 50px; right: 10px; min-width: 188px;
+        background: #fff; border: 1px solid rgba(15,23,42,0.08); border-radius: 14px;
+        box-shadow: 0 16px 44px rgba(15,23,42,0.18); padding: 6px;
+      }
+      html[data-theme="clean"] #mMenu { background: #fff; }
+      #mMenu.open { display: block; }
+      #mMenu button {
+        display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+        padding: 12px; border: none; background: transparent; border-radius: 10px;
+        font-size: 14px; color: var(--text-main); cursor: pointer; font-family: inherit;
+      }
+      #mMenu button:active { background: rgba(79,110,247,0.08); }
+      #mMenu .mm-sep { height: 1px; background: rgba(15,23,42,0.07); margin: 4px 8px; }
+
+      /* —— 控制台：隐藏桌面标题块，单列布局 —— */
+      #tabConsole .view-head { display: none; }
+      #tabConsole { padding: 0 12px 108px !important; }
+      .console-grid { display: grid !important; grid-template-columns: 1fr !important; gap: 14px; align-items: stretch; }
+      .console-main { display: block; }
+      .console-side { position: static !important; }
+
+      /* —— 步骤指示 —— */
+      #stepNav { display: flex; gap: 8px; padding: 12px 0 4px; }
+      .step-item { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+      .step-dot {
+        flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px; font-weight: 700; background: rgba(15,23,42,0.07); color: var(--text-muted);
+      }
+      .step-label { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .step-item.active .step-dot { background: var(--primary); color: #fff; box-shadow: 0 3px 8px rgba(79,110,247,0.3); }
+      .step-item.active .step-label { color: var(--text-main); font-weight: 700; }
+      .step-item.done .step-dot { background: rgba(22,163,74,0.14); color: #16a34a; }
+
+      /* —— Section 卡片 + 折叠 —— */
+      .step-card { margin: 0 !important; border-radius: 14px !important; }
+      .step-card.collapsible .step-head { cursor: pointer; display: flex; align-items: flex-start; }
+      .step-card.collapsible .step-head::after { content: "▾"; margin-left: auto; color: var(--text-muted); font-size: 14px; padding-left: 10px; }
+      .step-card.collapsed > *:not(.step-head) { display: none; }
+      .step-card.collapsed .step-head::after { content: "▸"; }
+
+      /* —— 场景区 —— */
+      .scene-toolbar { flex-direction: column; }
+      #sceneCatTabs, .recent-row {
+        display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px;
+        -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      }
+      #sceneCatTabs::-webkit-scrollbar, .recent-row::-webkit-scrollbar { display: none; }
+      .recent-row { align-items: center; }
+      .recent-label { flex-shrink: 0; margin-right: 4px; }
+      #sceneCatTabs .chip, .recent-row .chip { flex: 0 0 auto; margin: 0; white-space: nowrap; min-height: 34px; }
+      .scene-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+      .scene-card { min-height: 92px; display: flex; flex-direction: column; }
+      .sc-sum { -webkit-line-clamp: 2; }
+      /* 当前场景摘要 */
+      #currentScene {
+        display: none; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+        background: rgba(79,110,247,0.07); border: 1px solid rgba(79,110,247,0.2); align-items: center; gap: 8px;
+      }
+      #currentScene.show { display: flex; }
+      #currentScene .cs-emoji { font-size: 18px; }
+      #currentScene .cs-name { font-weight: 700; color: var(--text-main); font-size: 13.5px; }
+      #currentScene .cs-check { color: #16a34a; font-weight: 700; }
+
+      /* —— 场景描述 —— */
+      .prompt-box textarea { min-height: 120px; }
+
+      /* —— 上传区 —— */
+      .drop { padding: 24px 16px; font-size: 14px; text-align: center; border-radius: 14px; }
+      .thumb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+      .upthumb { position: relative; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; background: #f1f3f6; }
+      .upthumb img { width: 100%; height: 100%; object-fit: contain; background: #f1f3f6; }
+      .upthumb .x {
+        position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; border-radius: 50%;
+        background: rgba(15,23,42,0.62); color: #fff; border: none; font-size: 12px; cursor: pointer;
+      }
+      .continue-add {
+        display: flex; align-items: center; justify-content: center; aspect-ratio: 1 / 1;
+        border: 1.5px dashed #cbd5e1; border-radius: 12px; color: var(--text-muted); font-size: 26px;
+        cursor: pointer; background: #fafbfc;
+      }
+
+      /* —— 生成设置区 —— */
+      .set-row { margin-top: 14px; }
+      #ratioChips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      #ratioChips .chip { margin: 0; min-height: 44px; width: 100%; display: flex; align-items: center; justify-content: center; }
+      #modeChips { display: flex; gap: 8px; }
+      #modeChips .chip { flex: 1; margin: 0; min-height: 46px; display: flex; align-items: center; justify-content: center; }
+      .side-submit { display: none; }  /* 移动端用底部固定生成栏 */
+
+      /* —— 底部固定生成栏（Safe Area 适配） —— */
+      #genBar {
+        display: none; align-items: center; gap: 12px;
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 130;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+        background: var(--bg, #f8fafc);
+        border-top: 1px solid rgba(15,23,42,0.08);
+        box-shadow: 0 -6px 20px rgba(15,23,42,0.07);
+      }
+      html[data-theme="clean"] #genBar { background: #f7f8fa; }
+      body.on-console #genBar { display: flex; }
+      #genBtn { flex: 1; height: 52px; border-radius: 13px; font-size: 16px; font-weight: 700; }
+      #genFee { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+      #genBar .gen-spin {
+        width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.5); border-top-color: #fff;
+        border-radius: 50%; animation: genSpin .7s linear infinite; display: inline-block; vertical-align: -2px;
+      }
+      @keyframes genSpin { to { transform: rotate(360deg); } }
+
+      /* —— 历史/后台移动端单列 —— */
+      .gallery-grid { grid-template-columns: repeat(2, 1fr) !important; }
+      .admin-layout { flex-direction: column; }
+      .admin-side { position: static; flex: none; width: 100%; flex-direction: row; overflow-x: auto; gap: 8px; padding-bottom: 4px; }
+      .admin-side .adm-group { display: flex; flex: 0 0 auto; }
+    }
+    @media (min-width: 1024px) {
+      /* 桌面端：纯白/简洁场景上传后不再显示「继续添加」tile（用拖拽区即可） */
+      .continue-add { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -1266,6 +1599,19 @@
             <div class="view-sub">三步出图：<b>① 选场景 → ② 传产品图 → ③ 开始生成</b>。系统自动注入主体保真锁、物理防畸变与商业级画质约束，产品主体 / 材质 / Logo 不变，只换背景与环境光影。</div>
           </div>
 
+          <!-- 移动端顶栏 + 步骤条（≤1023px 显示） -->
+          <header id="mTopBar">
+            <button class="m-back" onclick="showTab('console')" aria-label="返回">←</button>
+            <div class="m-logo">🏞️</div>
+            <div class="m-title" id="mTitle">场景图片生成器</div>
+            <button class="m-more" id="mMoreBtn" onclick="toggleMobileMenu()" aria-label="菜单">⋮</button>
+          </header>
+          <div id="stepNav">
+            <div class="step-item active" id="si1"><span class="step-dot">1</span><span class="step-label">场景</span></div>
+            <div class="step-item" id="si2"><span class="step-dot">2</span><span class="step-label">产品</span></div>
+            <div class="step-item" id="si3"><span class="step-dot">3</span><span class="step-label">生成</span></div>
+          </div>
+
           <div class="console-grid">
             <!-- ========== 左栏：主流程 ========== -->
             <div class="console-main">
@@ -1284,6 +1630,7 @@
                 <div class="recent-row hidden" id="sceneRecent"></div>
                 <div class="scene-grid" id="sceneGrid"></div>
                 <div class="env-hint empty" id="sceneHint"></div>
+                <div id="currentScene"></div>
                 <div class="prompt-box">
                   <div class="pb-head">
                     <span>场景描述（自动填入，可微调）</span>
@@ -1382,55 +1729,108 @@
 
           <div class="glass-card" id="consoleProgress" style="display:none;">
             <div class="card-title">生成进度</div>
-            <div class="task-meta"><span class="task-id" id="cpId"></span> <span id="cpStatus"></span></div>
-            <div class="progress"><span id="cpBar" style="width:0%"></span></div>
+            <div id="cpList"></div>
             <div class="cost-line" id="cpInfo" style="margin-top:6px;"></div>
             <div class="task-acts"><button class="btn btn-ghost btn-sm" onclick="showTab('history')">前往我的历史查看</button></div>
           </div>
+
+          <!-- 移动端底部固定生成栏 + 菜单（≤1023px 显示） -->
+          <div id="genBar">
+            <span id="genFee">免费</span>
+            <button id="genBtn" class="btn btn-primary" onclick="mobileGenerate()">开始生成</button>
+          </div>
+          <div id="mMenu"></div>
         </div>
 
         <!-- 历史 -->
         <div id="tabHistory" class="hidden anim-view">
           <div class="view-head">
             <div class="view-title">我的历史</div>
-            <div class="view-sub">按时间倒序查看你提交过的全部任务，可逐张删除或整体打包下载。</div>
+            <div class="view-sub">查看和管理所有生成图片</div>
           </div>
-          <div class="glass-card">
-            <div class="card-title">历史生成记录</div>
-            <div id="historyTasks"><div class="empty">暂无记录</div></div>
-            <div class="pager">
-              <button class="btn btn-ghost btn-sm" id="histPrev" onclick="changeHistPage(-1)">上一页</button>
-              <span class="info" id="histPageInfo"></span>
-              <button class="btn btn-ghost btn-sm" id="histNext" onclick="changeHistPage(1)">下一页</button>
+
+          <!-- 顶部工具条：搜索 / 日期筛选 / 选择 -->
+          <div class="hist-toolbar">
+            <div class="hist-search">
+              <span class="hs-ico">🔍</span>
+              <input id="histSearch" type="text" placeholder="搜索提示词…" oninput="onHistSearchInput()" />
             </div>
+            <input id="histDate" type="date" class="hist-date" onchange="loadHistory(1)" title="按日期筛选" />
+            <button class="btn btn-ghost btn-sm" id="histSelectBtn" onclick="toggleSelectMode()">选择</button>
+          </div>
+
+          <!-- 批量操作栏（选择模式下显示） -->
+          <div class="hist-batchbar hidden" id="histBatchBar">
+            <label class="hist-selall"><input type="checkbox" id="histSelAll" onchange="toggleSelectAll(this.checked)" /> 全选</label>
+            <span class="hist-selcount" id="histSelCount">已选择 0 张</span>
+            <div class="hist-batch-acts">
+              <button class="btn btn-primary btn-sm" id="histExportBtn" onclick="batchExport()">批量导出</button>
+              <button class="btn btn-danger btn-sm" onclick="confirmBatchDelete()">批量删除</button>
+              <button class="btn btn-ghost btn-sm" onclick="toggleSelectMode()">取消选择</button>
+            </div>
+          </div>
+
+          <div class="hist-count" id="histCount"></div>
+
+          <!-- 图库网格 -->
+          <div class="gallery-grid" id="historyTasks"></div>
+
+          <!-- 空状态 -->
+          <div class="gallery-empty hidden" id="histEmpty">
+            <div class="ge-ico">🖼️</div>
+            <div class="ge-title">暂无生成图片</div>
+            <div class="ge-sub">开始生成你的第一张场景图片</div>
+            <button class="btn btn-primary" onclick="showTab('console')">去生成图片</button>
+          </div>
+
+          <!-- 分页 -->
+          <div class="pager hidden" id="histPager">
+            <button class="btn btn-ghost btn-sm" id="histPrev" onclick="changeHistPage(-1)">上一页</button>
+            <span class="info" id="histPageInfo"></span>
+            <button class="btn btn-ghost btn-sm" id="histNext" onclick="changeHistPage(1)">下一页</button>
           </div>
         </div>
 
         <!-- 管理后台 -->
         <div id="tabAdmin" class="hidden anim-view">
-          <div class="view-head">
-            <div class="view-title">管理后台</div>
-            <div class="view-sub">左侧分组导航：API 配置（Gemini / Agnes / Key 池）· 后台数据（统计 / 员工 / 任务 / 图片记录）· 注册邀请。</div>
+          <div class="dash-head">
+            <div class="dh-left">
+              <div class="dh-title">管理后台</div>
+              <div class="dh-sub">AI 场景图片生成平台的运营与系统管理中心</div>
+            </div>
+            <div class="dh-right">
+              <div class="dh-admin"><span class="av" id="dhAdminAv">A</span><span id="dhAdminName">admin</span></div>
+              <button class="btn btn-ghost btn-sm" onclick="refreshDashboard()">↻ 刷新数据</button>
+            </div>
           </div>
           <div class="admin-layout">
             <!-- ========== 左侧分组导航 ========== -->
             <aside class="admin-side">
-              <div class="adm-group">
-                <div class="adm-group-title">Api</div>
-                <button class="adm-nav-item" data-pane="gemini" onclick="showAdminPane('gemini')"><span class="adm-ico">🌐</span>Gemini 配置</button>
-                <button class="adm-nav-item" data-pane="agnes" onclick="showAdminPane('agnes')"><span class="adm-ico">🇨🇳</span>Agnes AI 配置</button>
-                <button class="adm-nav-item" data-pane="pool" onclick="showAdminPane('pool')"><span class="adm-ico">🗝️</span>Agnes Key 池</button>
-              </div>
-              <div class="adm-group">
-                <div class="adm-group-title">后台数据</div>
-                <button class="adm-nav-item active" data-pane="stats" onclick="showAdminPane('stats')"><span class="adm-ico">📊</span>统计看板</button>
-                <button class="adm-nav-item" data-pane="users" onclick="showAdminPane('users')"><span class="adm-ico">👥</span>员工列表</button>
-                <button class="adm-nav-item" data-pane="tasks" onclick="showAdminPane('tasks')"><span class="adm-ico">🗂️</span>全公司任务</button>
-                <button class="adm-nav-item" data-pane="images" onclick="showAdminPane('images')"><span class="adm-ico">🖼️</span>全公司图片记录</button>
-              </div>
-              <div class="adm-group">
-                <div class="adm-group-title">注册邀请</div>
-                <button class="adm-nav-item" data-pane="regcodes" onclick="showAdminPane('regcodes')"><span class="adm-ico">🎟️</span>注册邀请码</button>
+              <div class="adm-brand"><span class="logo">🏞️</span><span class="txt">ADMIN</span></div>
+              <div class="adm-nav">
+                <div class="adm-group">
+                  <div class="adm-group-title">概览</div>
+                  <button class="adm-nav-item active" data-pane="stats" onclick="showAdminPane('stats')"><span class="adm-ico">📊</span>统计看板</button>
+                </div>
+                <div class="adm-group">
+                  <div class="adm-group-title">AI 服务</div>
+                  <button class="adm-nav-item" data-pane="gemini" onclick="showAdminPane('gemini')"><span class="adm-ico">🌐</span>Gemini</button>
+                  <button class="adm-nav-item" data-pane="agnes" onclick="showAdminPane('agnes')"><span class="adm-ico">🇨🇳</span>Agnes AI</button>
+                  <button class="adm-nav-item" data-pane="pool" onclick="showAdminPane('pool')"><span class="adm-ico">🗝️</span>API Key Pool</button>
+                </div>
+                <div class="adm-group">
+                  <div class="adm-group-title">内容</div>
+                  <button class="adm-nav-item" data-pane="tasks" onclick="showAdminPane('tasks')"><span class="adm-ico">🗂️</span>生成任务</button>
+                  <button class="adm-nav-item" data-pane="images" onclick="showAdminPane('images')"><span class="adm-ico">🖼️</span>图片记录</button>
+                </div>
+                <div class="adm-group">
+                  <div class="adm-group-title">用户</div>
+                  <button class="adm-nav-item" data-pane="users" onclick="showAdminPane('users')"><span class="adm-ico">👥</span>员工</button>
+                </div>
+                <div class="adm-group">
+                  <div class="adm-group-title">系统</div>
+                  <button class="adm-nav-item" data-pane="regcodes" onclick="showAdminPane('regcodes')"><span class="adm-ico">🎟️</span>注册邀请码</button>
+                </div>
               </div>
             </aside>
 
@@ -1565,11 +1965,32 @@
                 </div>
               </section>
 
-              <!-- 统计看板 -->
+              <!-- 统计看板（Dashboard） -->
               <section class="adm-pane" data-pane="stats">
-                <div class="glass-card">
-                  <div class="card-title">统计看板</div>
-                  <div class="stats" id="adminStats"></div>
+                <div class="kpis" id="kpiRow"></div>
+                <div class="dash-cols">
+                  <div class="glass-card dash-card">
+                    <div class="card-title">图片生成趋势 <span style="font-size:12px;color:var(--text-muted);font-weight:500;margin-left:6px;">最近 7 天</span></div>
+                    <div class="area-chart" id="trendChart"></div>
+                  </div>
+                  <div class="glass-card dash-card">
+                    <div class="card-title">API 成本分析</div>
+                    <div class="cost-total" id="costTotal">$0.00 <small>累计消耗</small></div>
+                    <div class="cost-rank" id="costRank"></div>
+                  </div>
+                </div>
+                <div class="glass-card dash-card" style="margin-bottom:16px;">
+                  <div class="card-title">最近生成 <span style="font-size:12px;color:var(--text-muted);font-weight:500;margin-left:6px;">最新 8 张</span></div>
+                  <div class="recent-strip" id="recentStrip"></div>
+                </div>
+                <div class="glass-card dash-card">
+                  <div class="card-title">快捷操作</div>
+                  <div class="quick-actions">
+                    <button class="qa" onclick="showAdminPane('gemini')"><span class="ico">🌐</span>Gemini 配置</button>
+                    <button class="qa" onclick="showAdminPane('agnes')"><span class="ico">🇨🇳</span>Agnes AI</button>
+                    <button class="qa" onclick="showAdminPane('users')"><span class="ico">👥</span>员工管理</button>
+                    <button class="qa" onclick="showAdminPane('images')"><span class="ico">🖼️</span>图片记录</button>
+                  </div>
                 </div>
               </section>
 
@@ -1609,23 +2030,32 @@
                 </div>
               </section>
 
-              <!-- 全公司图片记录 -->
+              <!-- 全公司图片记录（图库） -->
               <section class="adm-pane hidden" data-pane="images">
                 <div class="glass-card">
                   <div class="card-title">全公司图片记录</div>
-                  <div class="card-sub">逐张查看全公司所有生成图片（含提交人），可按人员筛选并导出。</div>
-                  <div class="adm-tool">
+                  <div class="card-sub">逐张查看全公司所有生成图片（含提交人），可按人员 / 状态筛选并导出。</div>
+                  <div class="adm-tool" style="flex-wrap:wrap;">
+                    <input type="text" id="admImgSearch" class="glass-input" style="flex:1;min-width:160px;" placeholder="搜索提示词…" oninput="admImgSearchDebounce()" />
                     <label class="field-inline">人员：
                       <select id="admImgUser" onchange="loadAdminImages(1)">
                         <option value="">全部人员</option>
                       </select>
                     </label>
-                    <button class="btn btn-ghost btn-sm" onclick="exportAdminCsv()">导出 CSV（按人员）</button>
-                    <button class="btn btn-ghost btn-sm" onclick="exportAdminZip()">导出图片 ZIP（按人员）</button>
+                    <label class="field-inline">状态：
+                      <select id="admImgStatus" onchange="loadAdminImages(1)">
+                        <option value="">全部</option>
+                        <option value="completed">成功</option>
+                        <option value="failed">失败</option>
+                        <option value="processing">处理中</option>
+                        <option value="pending">待处理</option>
+                      </select>
+                    </label>
+                    <button class="btn btn-ghost btn-sm" onclick="exportAdminCsv()">导出 CSV</button>
+                    <button class="btn btn-ghost btn-sm" onclick="exportAdminZip()">导出 ZIP</button>
+                    <button class="btn btn-ghost btn-sm" onclick="loadAdminImages(1)">刷新</button>
                   </div>
-                  <div class="table-wrap">
-                    <table id="adminImgTable"><thead><tr><th>提交人</th><th>提示词</th><th>模型</th><th>模式</th><th>状态</th><th>消耗</th><th>时间</th><th>原图</th><th>结果图</th></tr></thead><tbody></tbody></table>
-                  </div>
+                  <div class="gallery-grid" id="adminImgGrid" style="margin-top:6px;"></div>
                   <div class="pager">
                     <button class="btn btn-ghost btn-sm" id="admImgPrev" onclick="changeAdmImgPage(-1)">上一页</button>
                     <span class="info" id="admImgPageInfo"></span>
@@ -1642,9 +2072,26 @@
 
   <!-- Toast / Lightbox -->
   <div class="app-toast" id="toast"></div>
-  <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
-    <button class="lb-close" onclick="closeLightbox(event)">×</button>
-    <img class="lb-img" id="lbImg" src="" alt="预览" />
+  <div class="lightbox" id="lightbox" onclick="onLightboxBg(event)">
+    <button class="lb-close" onclick="closeLightbox()">×</button>
+    <button class="lb-nav lb-prev" onclick="lbStep(-1)" title="上一张">‹</button>
+    <button class="lb-nav lb-next" onclick="lbStep(1)" title="下一张">›</button>
+    <div class="lb-stage">
+      <img class="lb-img" id="lbImg" src="" alt="预览" />
+    </div>
+    <div class="lb-side" id="lbSide"></div>
+  </div>
+
+  <!-- 通用确认对话框 -->
+  <div class="modal-overlay" id="confirmModal" onclick="if(event.target.id==='confirmModal')hideConfirm()">
+    <div class="modal-card confirm-card">
+      <div class="confirm-title" id="confirmTitle">确认删除</div>
+      <div class="confirm-msg" id="confirmMsg"></div>
+      <div class="confirm-acts">
+        <button class="btn btn-ghost" id="confirmCancel" onclick="hideConfirm()">取消</button>
+        <button class="btn btn-danger" id="confirmOk">确认删除</button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -1652,9 +2099,14 @@ const TOKEN_KEY = "bps_token";
 let meUser = null;
 let selectedFiles = [];        // 每个元素 {file, url}（用于缩略图预览）
 let selectedMode = "single";   // "single" 单图批量 / "multi_angle_fusion" 多角度合成
-let currentTaskId = null;      // 控制台当前正在轮询进度的任务
-let currentTaskPoll = null;
+const runningTasks = new Map(); // taskId -> {status, completed, total, cost_usd, id}
+let taskPollTimer = null;       // 多任务统一轮询器
 let histPage = 1;
+let histTotal = 0;                 // 当前筛选条件下的图片总数
+let selectedIds = new Set();       // 批量选择中的任务 id
+let histSelectMode = false;        // 是否处于选择模式
+let histSearchTimer = null;        // 搜索输入防抖
+let galleryList = [];              // 当前页卡片展示数据（供 Lightbox 左右切换）
 let admPage = 1;
 let admImgPage = 1;
 let regMode = null;        // /api/auth/registration-mode 的最新缓存
@@ -1755,7 +2207,7 @@ async function enterApp(){
   loadConfig();
   showTab("console");
   refreshProfile();
-  startPolling();
+  // 轮询由创建任务时自动启动，无需在 enterApp 启动空轮询
 }
 
 function logout(){ clearToken(); location.reload(); }
@@ -1787,6 +2239,9 @@ function showTab(name){
     view.classList.add(dir > 0 ? "view-slide-next" : "view-slide-prev");
   }
   moveNavPill();
+  document.body.classList.toggle("on-console", name==="console");
+  const _mt=document.getElementById("mTitle");
+  if(_mt) _mt.textContent = ({console:"场景图片生成器",history:"我的历史",admin:"管理后台"})[name] || "场景图片生成器";
   if(name==="history") loadHistory(1);
   if(name==="admin") loadAdmin();
   _curTab = name;
@@ -1820,7 +2275,14 @@ function renderThumbs(){
     d.appendChild(img); d.appendChild(b); grid.appendChild(d);
   });
   document.getElementById("fileCount").textContent = selectedFiles.length ? `已选择 ${selectedFiles.length} 张图片` : "";
+  if(selectedFiles.length){
+    const addBtn=document.createElement("div");
+    addBtn.className="continue-add"; addBtn.textContent="＋"; addBtn.title="继续添加产品图";
+    addBtn.onclick=()=>document.getElementById("files").click();
+    grid.appendChild(addBtn);
+  }
   updateUploadLabel();
+  updateConsoleChrome();
 }
 function removeFile(i){
   const x=selectedFiles[i]; if(x) URL.revokeObjectURL(x.url);
@@ -1853,6 +2315,7 @@ function selectMode(mode, btn){
   } else { el.className="env-hint empty"; el.innerHTML=""; }
   updateUploadLabel();
   updateSummary();
+  updateConsoleChrome();
 }
 
 /* ==========================================================================
@@ -2097,7 +2560,7 @@ function selectScene(s){
       ? "已选择 " + s.name + "：已自动切到「" + shortModelName(selectedModel) + "」提升抠图保真，可点模型卡手动换回"
       : "已选择场景：" + s.name);
   }
-  renderSceneLibrary(); updateSceneHint(); updateSummary(); rememberScene(s.key);
+  renderSceneLibrary(); updateSceneHint(); updateSummary(); rememberScene(s.key); updateConsoleChrome();
 }
 async function fetchScenePreview(theme, key){
   try{
@@ -2350,7 +2813,7 @@ async function loadConfig(){
         showToast("管理员已关闭 Gemini 模型，已为你切回 " + shortModelName(selectedModel));
       }
       renderModelCards(); renderRatioChips(); renderModifiers(); renderSceneLibrary();
-      updateModelPriceHint(); updateSummary();
+      updateModelPriceHint(); updateSummary(); updateConsoleChrome();
     }
   }catch(e){ /* 配置拉取失败不影响使用，保留默认选项 */ }
 }
@@ -2369,77 +2832,197 @@ async function createTask(){
   if(isFusion && !(selectedFiles.length>=2 && selectedFiles.length<=4)){
     return setMsg("createMsg","多角度合成模式需要上传 2~4 张同一产品的不同角度图",true);
   }
-  const fd=new FormData(); fd.append("prompt",prompt); fd.append("model",model);
-  fd.append("mode", isFusion ? "multi_angle_fusion" : "single");
-  fd.append("ratio", selectedRatio);   // 输出比例（agnes 等支持 ratio 的模型使用；''=原图比例）
-  // 节日/季节主题（鬼节 / 春 / 秋）：非空时后端注入居中构图锁 + 主题氛围层；
-  // theme_random=true 时逐张独立随机组合背景/元素/光影（seed 可复现）。
-  if(selectedTheme){
-    fd.append("theme", selectedTheme);
-    fd.append("theme_random", selectedThemeRandom ? "true" : "false");
+
+  // 统一构造公共字段的 FormData（不含 files）
+  function makeBaseForm(){
+    const fd=new FormData();
+    fd.append("prompt", prompt);
+    fd.append("model", model);
+    fd.append("mode", isFusion ? "multi_angle_fusion" : "single");
+    fd.append("ratio", selectedRatio);   // ''=原图比例，后端按本张图真实尺寸解析
+    if(selectedTheme){
+      fd.append("theme", selectedTheme);
+      fd.append("theme_random", selectedThemeRandom ? "true" : "false");
+    }
+    const whiteAuto = /rgb\s*255|pure solid white background|blank white background|#ffffff|white background/i.test(prompt);
+    fd.append("is_white_bg", (selectedWhiteBg || whiteAuto) ? "true" : "false");
+    return fd;
   }
-  // 纯白底模式：优先取预设标记，否则按框内文本兜底识别 A 组纯白短语，确保手动改写也生效
-  const whiteAuto = /rgb\s*255|pure solid white background|blank white background|#ffffff|white background/i.test(prompt);
-  fd.append("is_white_bg", (selectedWhiteBg || whiteAuto) ? "true" : "false");
-  selectedFiles.forEach(x=>fd.append("files", x.file));
+
   const btn=document.getElementById("submitBtn"); btn.disabled=true;
   try{
-    const res=await api("POST","/api/tasks/create",{body:fd});
-    if(res.status===401){ clearToken(); return location.reload(); }
-    if(!res.ok){ const e=await res.json().catch(()=>({})); return setMsg("createMsg",e.detail||"创建失败",true); }
-    const d=await res.json();
-    setMsg("createMsg", isFusion ? `多角度合成任务已创建：将融合生成 1 张场景图` : `任务已创建：共 ${d.total_count} 张`, false);
+    if(isFusion){
+      // 多角度合成：仍需一次上传全部参考图，由后端融合为 1 张
+      const fd=makeBaseForm();
+      selectedFiles.forEach(x=>fd.append("files", x.file));
+      const res=await api("POST","/api/tasks/create",{body:fd});
+      if(res.status===401){ clearToken(); return location.reload(); }
+      if(!res.ok){ const e=await res.json().catch(()=>({})); return setMsg("createMsg",e.detail||"创建失败",true); }
+      const d=await res.json();
+      setMsg("createMsg","多角度合成任务已创建：将融合生成 1 张场景图", false);
+      startTaskPolling(d.id);
+    } else {
+      // 单图批量：拆成 N 个独立任务，每个任务只传 1 张图，
+      // 这样后端能为每张图单独解析原图比例，完成一张反馈一张。
+      const total=selectedFiles.length;
+      let okCount=0, firstError="";
+      for(let i=0;i<total;i++){
+        const fd=makeBaseForm();
+        fd.append("files", selectedFiles[i].file);
+        const res=await api("POST","/api/tasks/create",{body:fd});
+        if(res.status===401){ clearToken(); return location.reload(); }
+        if(!res.ok){
+          const e=await res.json().catch(()=>({}));
+          firstError=e.detail||"创建失败";
+          setMsg("createMsg",`第 ${i+1}/${total} 张提交失败：${firstError}`,true);
+          continue;
+        }
+        const d=await res.json();
+        okCount++;
+        startTaskPolling(d.id);
+        setMsg("createMsg",`已提交 ${i+1}/${total} 张任务`, false);
+      }
+      if(okCount===0){
+        return;   // 错误信息已在循环内设置
+      } else if(okCount<total){
+        setMsg("createMsg",`已拆分为 ${okCount} 个单张任务（${total-okCount} 张提交失败）`,true);
+      } else {
+        setMsg("createMsg",`全部 ${total} 张已拆分为单张任务，正在逐张生成`, false);
+      }
+    }
+
+    // 提交完成：清空控制台输入，但保留缩略图直到用户离开/刷新
     document.getElementById("prompt").value="";
-    resetScene();   // 任务已提交：复位场景 / 主题态，避免下一批误带上次的场景
+    resetScene();
     selectedFiles.forEach(x=>URL.revokeObjectURL(x.url));
     selectedFiles=[]; document.getElementById("files").value=""; renderThumbs();
-    startCurrentTaskPoll(d.id);
-    refreshProfile();   // 刷新今日额度展示（Worker 出图后轮询结束还会再刷新）
+    refreshProfile();
   } finally { btn.disabled=false; }
 }
 
 function badge(status){ const m={pending:["待处理","st-pending"],processing:["处理中","st-processing"],completed:["已完成","st-completed"],failed:["失败","st-failed"]}; const [t,c]=m[status]||["?","st-pending"]; return `<span class="badge ${c}">${t}</span>`; }
 
+/* ---------- 我的历史：图库卡片（一条任务 = 一张图） ---------- */
+function renderGalleryCard(t, idx){
+  const it = (t.items && t.items[0]) || null;
+  const src = it && it.output_url ? it.output_url : (it && it.original_url ? it.original_url : "");
+  const fullPrompt = t.full_prompt || t.prompt || "";
+  const promptShown = (t.prompt || fullPrompt || "(空)").toString();
+
+  const card = document.createElement("div");
+  card.className = "gcard";
+  card.dataset.id = t.id;
+  card.dataset.idx = idx;
+
+  // 图片（视觉主体，点击开 Lightbox）
+  const imgWrap = document.createElement("div"); imgWrap.className = "gcard-img";
+  if(src){
+    const im = document.createElement("img");
+    im.src = src; im.alt = "生成图片"; im.loading = "lazy";
+    im.onclick = () => openLightbox(idx);
+    imgWrap.appendChild(im);
+  } else {
+    const ph = document.createElement("div"); ph.className = "placeholder"; ph.style.height = "100%";
+    ph.textContent = stText(it ? it.status : t.status);
+    imgWrap.appendChild(ph);
+  }
+  // Hover 轻操作层（查看大图 / 下载）
+  const ov = document.createElement("div"); ov.className = "gcard-overlay";
+  const obView = document.createElement("button"); obView.className = "ob-btn"; obView.textContent = "查看大图"; obView.onclick = () => openLightbox(idx);
+  const obDl = document.createElement("button"); obDl.className = "ob-btn"; obDl.textContent = "下载"; obDl.onclick = () => downloadImage(src, t.id);
+  ov.appendChild(obView); ov.appendChild(obDl);
+  imgWrap.appendChild(ov);
+  // 左上角选择框（hover 或选择模式显示）
+  const chk = document.createElement("input"); chk.type = "checkbox"; chk.className = "gcard-check";
+  chk.dataset.id = t.id;
+  chk.onclick = (e) => { e.stopPropagation(); onCardCheck(t.id, chk.checked); };
+  imgWrap.appendChild(chk);
+  card.appendChild(imgWrap);
+
+  // 信息区：日期 / 用户 + 提示词 + 复制/下载
+  const info = document.createElement("div"); info.className = "gcard-info";
+  const meta = document.createElement("div"); meta.className = "gcard-meta";
+  const dEl = document.createElement("span"); dEl.textContent = "🕒 " + fmt(t.created_at);
+  const uEl = document.createElement("span"); uEl.textContent = "👤 " + (meUser ? meUser.username : "");
+  meta.appendChild(dEl); meta.appendChild(uEl);
+  info.appendChild(meta);
+
+  const pr = document.createElement("div"); pr.className = "gcard-prompt"; pr.textContent = promptShown; pr.title = promptShown;
+  info.appendChild(pr);
+
+  const acts = document.createElement("div"); acts.className = "gcard-acts";
+  const cp = document.createElement("button"); cp.className = "btn btn-ghost btn-sm"; cp.textContent = "复制提示词";
+  cp.onclick = () => copyGalleryPrompt(cp, fullPrompt || promptShown);
+  const dl = document.createElement("button"); dl.className = "btn btn-ghost btn-sm"; dl.textContent = "下载";
+  dl.onclick = () => downloadImage(src, t.id);
+  acts.appendChild(cp); acts.appendChild(dl);
+  info.appendChild(acts);
+
+  card.appendChild(info);
+  return card;
+}
+
+function downloadImage(src, taskId){
+  if(!src){ return showToast("该图片尚未生成或已不可用"); }
+  const a = document.createElement("a"); a.href = src; a.download = (taskId || "image") + ".png";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+function copyGalleryPrompt(btn, text){
+  if(!text){ return showToast("没有可复制的提示词"); }
+  const done = () => { const old = btn.textContent; btn.textContent = "✓ 已复制"; setTimeout(()=>{ btn.textContent = old; }, 1500); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+
 // 历史/任务卡片：图片（原图 + 生成图）直接内联渲染，刷新后也能看到
 function renderTaskCard(t, withActions){
-  const card=document.createElement("div"); card.className="glass-card";
-  const head=document.createElement("div"); head.className="task-head";
-  const modeTag = t.mode==="multi_angle_fusion" ? '<span class="badge st-processing">🅱️ 多角度合成</span> ' : '';
-  head.innerHTML=`<div class="task-meta"><span class="task-id">${t.id.slice(0,8)}…</span> ${badge(t.status)} ${modeTag}
-    <span class="task-sub">${t.completed_count}/${t.total_count} 成功 · ${t.failed_count} 失败</span></div>`;
-  card.appendChild(head);
-  const metaBits = [];
+  const card=document.createElement("div"); card.className="glass-card hist-row";
+  // 头部：任务号 + 状态 + 计数 + 元信息（消耗/模型/纯白底/场景）
+  const head=document.createElement("div"); head.className="hist-row-head";
+  const modeTag = t.mode==="multi_angle_fusion" ? '<span class="badge st-processing">🅱️ 多角度合成</span>' : '';
+  let headHtml=`<span class="task-id">${t.id.slice(0,8)}…</span> ${badge(t.status)} ${modeTag}
+    <span class="task-sub">${t.completed_count}/${t.total_count} 成功 · ${t.failed_count} 失败</span>`;
+  const metaBits=[];
   if(t.cost_usd){ metaBits.push(`消耗 <b>$${t.cost_usd.toFixed(4)}</b>`); }
   if(t.model){ metaBits.push(t.model); }
   if(t.is_white_bg){ metaBits.push("⚪ 纯白底模式"); }
   if(t.env){ metaBits.push(t.env==="indoor" ? "🏠 室内" : "🌿 室外"); }
-  if(metaBits.length){ const c=document.createElement("div"); c.className="cost-line"; c.innerHTML=metaBits.join(" · "); card.appendChild(c); }
+  if(metaBits.length){ headHtml+=`<span class="hist-meta">${metaBits.join(" · ")}</span>`; }
+  head.innerHTML=headHtml;
+  card.appendChild(head);
 
-  // 提示词展示 + 一键复制（复制的是后端四层完整拼装后的提示词）
+  // 主体：左提示词 / 右图片（紧凑横向）
+  const body=document.createElement("div"); body.className="hist-row-body";
+
+  // 左：提示词 + 一键复制
   const fullPrompt = t.full_prompt || t.prompt || "";
   const shown = (t.prompt || fullPrompt || "(空)").toString();
-  const promptBlock = document.createElement("div"); promptBlock.className="task-prompt";
-  const tpText = document.createElement("span"); tpText.className="tp-text";
+  const promptCol=document.createElement("div"); promptCol.className="hist-prompt";
+  const tpText=document.createElement("span"); tpText.className="tp-text";
   tpText.textContent = shown.length>200 ? shown.slice(0,200)+"…" : shown;
-  const tpCopy = document.createElement("button"); tpCopy.className="btn btn-ghost btn-sm tp-copy";
+  const tpCopy=document.createElement("button"); tpCopy.className="btn btn-ghost btn-sm tp-copy";
   tpCopy.textContent="复制提示词"; tpCopy.title="复制后端四层完整拼装后的提示词（含系统自动注入的保真/防畸变/画质约束）";
   tpCopy.onclick=()=>copyPrompt(fullPrompt || shown);
-  promptBlock.appendChild(tpText); promptBlock.appendChild(tpCopy);
-  card.appendChild(promptBlock);
+  promptCol.appendChild(tpText); promptCol.appendChild(tpCopy);
+  body.appendChild(promptCol);
 
-  // 图片网格（原图 + 生成图）直接渲染，刷新后也能看到图片
+  // 右：图片（原图 + 生成图）
   if(t.items && t.items.length){
-    const itemsWrap=document.createElement("div"); itemsWrap.className="items";
-    t.items.forEach(it=>itemsWrap.appendChild(renderItem(it, t.id)));
-    card.appendChild(itemsWrap);
+    const imgs=document.createElement("div"); imgs.className="hist-imgs";
+    t.items.forEach(it=>imgs.appendChild(renderItem(it, t.id)));
+    body.appendChild(imgs);
   }
 
+  // 右：操作（下载 / 删除）
   if(withActions){
-    const acts=document.createElement("div"); acts.className="task-acts";
+    const acts=document.createElement("div"); acts.className="hist-actions";
     const dl=document.createElement("button"); dl.className="btn btn-ghost btn-sm"; dl.textContent="下载 ZIP"; dl.onclick=()=>downloadZip(t.id);
     const del=document.createElement("button"); del.className="btn btn-danger btn-sm"; del.textContent="删除任务"; del.onclick=()=>delTask(t.id);
-    acts.appendChild(dl); acts.appendChild(del); card.appendChild(acts);
+    acts.appendChild(dl); acts.appendChild(del); body.appendChild(acts);
   }
+  card.appendChild(body);
   return card;
 }
 
@@ -2460,34 +3043,92 @@ function renderItem(it, taskId){
 }
 function stText(s){ return {pending:"等待中",processing:"生成中",success:"成功",failed:"失败"}[s]||s; }
 
-/* ---------- 控制台当前任务进度轮询 ---------- */
-function startCurrentTaskPoll(taskId){
-  currentTaskId = taskId;
-  const box=document.getElementById("consoleProgress"); if(box) box.style.display="";
-  const idEl=document.getElementById("cpId"); if(idEl) idEl.textContent=taskId.slice(0,8)+"…";
-  if(currentTaskPoll) clearInterval(currentTaskPoll);
-  currentTaskPoll=setInterval(pollCurrentTask, 2500);
-  pollCurrentTask();
-}
-async function pollCurrentTask(){
-  if(!currentTaskId) return;
-  const res=await api("GET",`/api/tasks/${currentTaskId}`);
-  if(!res.ok) return;
-  const d=await res.json();
-  const st=document.getElementById("cpStatus"); if(st) st.innerHTML=badge(d.status);
-  const bar=document.getElementById("cpBar"); if(bar) bar.style.width=(d.progress_percent||0)+"%";
-  const info=document.getElementById("cpInfo");
-  if(info) info.innerHTML=`${d.completed_count}/${d.total_count} 成功 · ${d.failed_count} 失败` + (d.cost_usd?` · 消耗 <b>$${d.cost_usd.toFixed(4)}</b>`:"");
-  if(d.status==="completed" || d.status==="failed"){
-    if(currentTaskPoll){ clearInterval(currentTaskPoll); currentTaskPoll=null; }
-    refreshProfile();   // 出图完成 → 更新今日免费额度进度
+/* ---------- 控制台多任务进度轮询 ---------- */
+function startTaskPolling(taskId){
+  if(!runningTasks.has(taskId)){
+    runningTasks.set(taskId,{id:taskId,status:"pending",completed:0,total:1,cost_usd:0});
   }
+  const box=document.getElementById("consoleProgress"); if(box) box.style.display="";
+  renderProgressPanel();
+  if(!taskPollTimer) taskPollTimer=setInterval(pollRunningTasks, 2500);
+  pollRunningTasks();
+}
+function stopTaskPolling(){
+  if(taskPollTimer){ clearInterval(taskPollTimer); taskPollTimer=null; }
+}
+async function pollRunningTasks(){
+  if(runningTasks.size===0){ stopTaskPolling(); return; }
+  const ids=Array.from(runningTasks.keys());
+  const results=await Promise.all(ids.map(async id=>{
+    try{
+      const res=await api("GET",`/api/tasks/${id}`);
+      if(!res.ok) return null;
+      return await res.json();
+    }catch(e){ return null; }
+  }));
+  let anyFinished=false, totalCost=0;
+  results.forEach(d=>{
+    if(!d) return;
+    const prev=runningTasks.get(d.id);
+    if(!prev) return;
+    runningTasks.set(d.id,{...prev,
+      status:d.status,
+      completed:d.completed_count||0,
+      total:d.total_count||1,
+      cost_usd:d.cost_usd||0,
+      progress:d.progress_percent||0
+    });
+    totalCost += d.cost_usd||0;
+    if(d.status==="completed" || d.status==="failed"){
+      runningTasks.delete(d.id);
+      const statusText = d.status==="completed" ? "完成" : "失败";
+      showToast(`任务 ${d.id.slice(0,8)}… ${statusText} (${d.completed_count}/${d.total_count})`);
+      anyFinished=true;
+    }
+  });
+  renderProgressPanel();
+  if(anyFinished) refreshProfile();
+  if(runningTasks.size===0) stopTaskPolling();
+}
+function renderProgressPanel(){
+  const box=document.getElementById("consoleProgress"); if(!box) return;
+  if(runningTasks.size===0){ box.style.display="none"; return; }
+  box.style.display="";
+  const listEl=document.getElementById("cpList");
+  const infoEl=document.getElementById("cpInfo");
+  let total=0, completed=0, failed=0, pending=0, processing=0, totalCost=0;
+  runningTasks.forEach(t=>{
+    total += t.total||1;
+    if(t.status==="completed") completed += t.total||1;
+    else if(t.status==="failed") failed += t.total||1;
+    else if(t.status==="processing") processing++;
+    else pending++;
+    totalCost += t.cost_usd||0;
+  });
+  let html="";
+  runningTasks.forEach(t=>{
+    const isActive = t.status==="pending" || t.status==="processing";
+    const animated = isActive ? "animated" : "";
+    const width = isActive ? "70%" : "100%";
+    html += `<div style="margin-bottom:10px;">
+      <div class="task-meta"><span class="task-id">${t.id.slice(0,8)}…</span> ${badge(t.status)}</div>
+      <div class="progress ${animated}"><span style="width:${width}"></span></div>
+    </div>`;
+  });
+  if(listEl) listEl.innerHTML=html;
+  let info=`${completed}/${total} 成功 · ${failed} 失败`;
+  if(pending+processing>0) info += ` · ${pending+processing} 进行中`;
+  if(totalCost>0) info += ` · 消耗 <b>$${totalCost.toFixed(4)}</b>`;
+  if(infoEl) infoEl.innerHTML=info;
 }
 
 async function delItem(itemId){
   if(!confirm("确认删除该图片（物理文件与记录）？")) return;
   const res=await api("DELETE",`/api/items/${itemId}`);
-  if(res.ok){ showToast("已删除该图片"); loadHistory(histPage); }
+  if(res.ok){ showToast("已删除该图片");
+    if(!document.getElementById("tabAdmin").classList.contains("hidden")) loadAdminImages(admImgPage);
+    else loadHistory(histPage);
+  }
   else showToast("删除失败");
 }
 async function delTask(taskId){
@@ -2502,27 +3143,142 @@ function downloadZip(taskId){
     .catch(()=>showToast("下载失败，可能任务尚未完成或已无成功图片。"));
 }
 
-/* ---------- 历史 ---------- */
+/* ---------- 历史（图片图库） ---------- */
 async function loadHistory(page){
-  histPage=page;
-  const res=await api("GET",`/api/tasks/my-history?page=${page}&page_size=10`);
+  histPage = page;
+  const q = document.getElementById("histSearch").value.trim();
+  const date = document.getElementById("histDate").value;
+  const params = new URLSearchParams({ page, page_size: 24 });
+  if(q) params.set("q", q);
+  if(date) params.set("date", date);
+  const res = await api("GET", `/api/tasks/my-history?${params.toString()}`);
   if(res.status===401){ clearToken(); return location.reload(); }
-  const d=await res.json();
-  const box=document.getElementById("historyTasks");
-  if(!d.items.length){ box.innerHTML='<div class="empty">暂无记录</div>'; }
-  else { box.innerHTML=""; d.items.forEach(t=>box.appendChild(renderTaskCard(t,true))); }
-  document.getElementById("histPageInfo").textContent=`第 ${d.page} / ${Math.max(1,Math.ceil(d.total/d.page_size))} 页`;
-  document.getElementById("histPrev").disabled = d.page<=1;
-  document.getElementById("histNext").disabled = d.page*d.page_size>=d.total;
+  const d = await res.json();
+  histTotal = d.total || 0;
+  galleryList = d.items.map(t => {
+    const it = (t.items && t.items[0]) || null;
+    return {
+      id: t.id,
+      src: (it && it.output_url) || (it && it.original_url) || "",
+      prompt: t.full_prompt || t.prompt || "",
+      created_at: t.created_at,
+      username: meUser ? meUser.username : ""
+    };
+  });
+
+  const box = document.getElementById("historyTasks");
+  const empty = document.getElementById("histEmpty");
+  const pager = document.getElementById("histPager");
+  const count = document.getElementById("histCount");
+  box.innerHTML = "";
+  if(!d.items.length){
+    box.classList.add("hidden"); empty.classList.remove("hidden"); pager.classList.add("hidden");
+    count.textContent = (q || date) ? "没有符合条件的图片" : "共 0 张图片";
+  } else {
+    box.classList.remove("hidden"); empty.classList.add("hidden"); pager.classList.remove("hidden");
+    d.items.forEach((t, i) => box.appendChild(renderGalleryCard(t, i)));
+    count.textContent = `共 ${histTotal} 张图片`;
+  }
+  document.getElementById("histPageInfo").textContent = `第 ${d.page} / ${Math.max(1, Math.ceil(d.total / d.page_size))} 页`;
+  document.getElementById("histPrev").disabled = d.page <= 1;
+  document.getElementById("histNext").disabled = d.page * d.page_size >= d.total;
+  if(!histSelectMode) selectedIds.clear();
+  syncSelectUI();
 }
-function changeHistPage(delta){ const next=histPage+delta; if(next>=1) loadHistory(next); }
+function changeHistPage(delta){ const next = histPage + delta; if(next >= 1) loadHistory(next); }
+
+function onHistSearchInput(){
+  if(histSearchTimer) clearTimeout(histSearchTimer);
+  histSearchTimer = setTimeout(() => loadHistory(1), 350);
+}
+
+/* ---------- 选择 / 批量操作 ---------- */
+function toggleSelectMode(){
+  histSelectMode = !histSelectMode;
+  const bar = document.getElementById("histBatchBar");
+  const grid = document.getElementById("historyTasks");
+  const btn = document.getElementById("histSelectBtn");
+  if(histSelectMode){
+    bar.classList.remove("hidden"); grid.classList.add("selecting");
+    btn.textContent = "完成"; btn.classList.add("btn-primary");
+  } else {
+    bar.classList.add("hidden"); grid.classList.remove("selecting");
+    btn.textContent = "选择"; btn.classList.remove("btn-primary");
+    selectedIds.clear();
+  }
+  syncSelectUI();
+}
+function onCardCheck(id, checked){
+  if(checked) selectedIds.add(id); else selectedIds.delete(id);
+  const card = document.querySelector(`.gcard[data-id="${id}"]`);
+  if(card) card.classList.toggle("selected", checked);
+  updateSelCount();
+}
+function toggleSelectAll(checked){
+  document.querySelectorAll("#historyTasks .gcard").forEach(c => {
+    const id = c.dataset.id;
+    if(checked) selectedIds.add(id); else selectedIds.delete(id);
+    c.classList.toggle("selected", checked);
+    const chk = c.querySelector(".gcard-check"); if(chk) chk.checked = checked;
+  });
+  updateSelCount();
+}
+function syncSelectUI(){
+  document.querySelectorAll("#historyTasks .gcard").forEach(c => {
+    const on = histSelectMode && selectedIds.has(c.dataset.id);
+    c.classList.toggle("selected", on);
+    const chk = c.querySelector(".gcard-check"); if(chk) chk.checked = on;
+  });
+  updateSelCount();
+}
+function updateSelCount(){
+  document.getElementById("histSelCount").textContent = `已选择 ${selectedIds.size} 张`;
+  const all = document.querySelectorAll("#historyTasks .gcard");
+  const selAll = document.getElementById("histSelAll");
+  selAll.checked = all.length > 0 && selectedIds.size === all.length;
+  selAll.indeterminate = selectedIds.size > 0 && selectedIds.size < all.length;
+}
+async function batchExport(){
+  if(selectedIds.size === 0) return showToast("请先选择要导出的图片");
+  const btn = document.getElementById("histExportBtn");
+  const old = btn.textContent; btn.textContent = "正在打包…"; btn.disabled = true;
+  try{
+    const res = await fetch("/api/tasks/batch-download-zip", {
+      method: "POST", headers: authHeaders({"Content-Type":"application/json"}),
+      body: JSON.stringify({ ids: Array.from(selectedIds) })
+    });
+    if(!res.ok){ const e = await res.json().catch(()=>({})); showToast(e.detail || "导出失败"); return; }
+    const blob = await res.blob();
+    const u = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = u; a.download = `images_${Date.now()}.zip`; a.click(); URL.revokeObjectURL(u);
+    showToast(`已导出 ${selectedIds.size} 张图片`);
+  }catch(e){ showToast("导出失败"); }
+  finally { btn.textContent = old; btn.disabled = false; }
+}
+function confirmBatchDelete(){
+  if(selectedIds.size === 0) return showToast("请先选择要删除的图片");
+  showConfirm("删除图片", `确定要删除选中的 ${selectedIds.size} 张图片吗？删除后无法恢复。`, doBatchDelete);
+}
+async function doBatchDelete(){
+  const n = selectedIds.size;
+  const res = await api("POST", "/api/tasks/batch-delete", { json: { ids: Array.from(selectedIds) } });
+  if(!res.ok){ const e = await res.json().catch(()=>({})); showToast(e.detail || "批量删除失败"); return; }
+  showToast(`已删除 ${n} 张图片`);
+  selectedIds.clear();
+  loadHistory(histPage);   // 重新加载当前页，保持分页位置
+}
+
+/* ---------- 通用确认对话框 ---------- */
+function showConfirm(title, msg, onOk){
+  document.getElementById("confirmTitle").textContent = title;
+  document.getElementById("confirmMsg").textContent = msg;
+  document.getElementById("confirmOk").onclick = () => { hideConfirm(); onOk(); };
+  document.getElementById("confirmModal").classList.add("show");
+}
+function hideConfirm(){ document.getElementById("confirmModal").classList.remove("show"); }
 
 /* ---------- 管理后台 ---------- */
 const _admLoaded = {};   // 记录各右侧面板是否已加载过数据（首次点开才请求）
-async function loadAdmin(){
-  await loadApiSettings();   // 配置表单（Gemini / Agnes）始终先拉取
-  showAdminPane("stats");    // 默认落在「统计看板」，其余面板点开才加载
-}
 function showAdminPane(pane){
   document.querySelectorAll("#tabAdmin .adm-pane")
     .forEach(p => p.classList.toggle("hidden", p.dataset.pane !== pane));
@@ -2537,18 +3293,96 @@ function showAdminPane(pane){
   else if(pane === "pool")    loadAdminKeys();
   else if(pane === "regcodes") loadAdminRegCodes();
 }
+async function loadAdmin(){
+  if(meUser){ const av=document.getElementById("dhAdminAv"); const nm=document.getElementById("dhAdminName");
+    if(av) av.textContent=(meUser.username||"A").slice(0,1).toUpperCase();
+    if(nm) nm.textContent=meUser.username||"admin"; }
+  await loadApiSettings();   // 配置表单（Gemini / Agnes）始终先拉取
+  showAdminPane("stats");    // 默认落在「统计看板」，其余面板点开才加载
+}
+function kpiCard(label, sub, num, accent){
+  return `<div class="kpi"><div class="k-label">${label}</div><div class="k-num${accent?' accent':''}">${num}</div><div class="k-sub">${sub}</div></div>`;
+}
+function renderAreaChart(elId, daily){
+  const el=document.getElementById(elId); if(!el) return;
+  const W=560,H=200,padL=10,padR=10,padT=14,padB=22;
+  const data=(daily||[]).map(x=>({d:x.date, v:x.count||0}));
+  if(!data.length){ el.innerHTML='<div class="cost-empty">暂无数据</div>'; return; }
+  const maxv=Math.max(1, ...data.map(x=>x.v));
+  const n=data.length, cw=W-padL-padR, chh=H-padT-padB;
+  const stepX=n>1?cw/(n-1):0;
+  const pts=data.map((x,i)=>{
+    const px=padL+(n>1?i*stepX:cw/2);
+    const py=padT+chh-(x.v/maxv)*chh;
+    return [px,py];
+  });
+  const line=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+  const baseY=(padT+chh).toFixed(1);
+  const area=line+` L ${pts[n-1][0].toFixed(1)} ${baseY} L ${pts[0][0].toFixed(1)} ${baseY} Z`;
+  const grid=[0,0.5,1].map(f=>{ const gy=(padT+chh-f*chh).toFixed(1); return `<line class="axis-line" x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}"/>`; }).join("");
+  const labels=data.map((x,i)=>{ if(n>7 && i%2!==0 && i!==n-1) return ""; return `<text x="${pts[i][0].toFixed(1)}" y="${H-6}" text-anchor="middle">${x.d.slice(5)}</text>`; }).join("");
+  const dots=pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="#fff" stroke="#4f6ef7" stroke-width="1.6"/>`).join("");
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">
+    <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4f6ef7" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#4f6ef7" stop-opacity="0.02"/>
+    </linearGradient></defs>
+    ${grid}
+    <path d="${area}" fill="url(#areaGrad)"/>
+    <path d="${line}" fill="none" stroke="#4f6ef7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}${labels}
+  </svg>`;
+}
 async function loadAdminStats(){
   const s=await api("GET","/api/admin/dashboard/stats");
   if(s.status===401){clearToken();return location.reload();}
-  if(s.ok){ const d=await s.json();
-    let byModel="";
-    const keys=Object.keys(d.cost_by_model||{});
-    if(keys.length){ byModel='<div class="stat-note">按模型消耗（USD）：'+keys.map(k=>`${k}: $${d.cost_by_model[k].toFixed(4)}`).join("　")+'</div>'; }
-    document.getElementById("adminStats").innerHTML=
-    `<div class="stat"><div class="n">${d.total_users}</div><div class="l">注册员工数</div></div>
-     <div class="stat"><div class="n">${d.total_api_calls}</div><div class="l">系统总 API 调用</div></div>
-     <div class="stat"><div class="n">${d.total_images_generated}</div><div class="l">累计生成图片</div></div>
-     <div class="stat"><div class="n">$${d.total_cost_usd.toFixed(2)}</div><div class="l">累计消耗 (USD)</div></div>` + byModel; }
+  if(!s.ok) return;
+  const d=await s.json();
+  const weekSum=(d.daily_images||[]).reduce((a,x)=>a+(x.count||0),0);
+  document.getElementById("kpiRow").innerHTML=
+    kpiCard("用户","注册员工", d.total_users, false) +
+    kpiCard("API 调用","累计调用", d.total_api_calls, false) +
+    kpiCard("生成图片","近 7 天 "+weekSum, d.total_images_generated, false) +
+    kpiCard("API 成本","累计消耗", "$"+d.total_cost_usd.toFixed(2), true);
+  document.getElementById("costTotal").innerHTML = "$"+d.total_cost_usd.toFixed(2)+' <small>累计消耗</small>';
+  const costRank=document.getElementById("costRank");
+  const byModel=d.cost_by_model||{};
+  const mkeys=Object.keys(byModel);
+  if(mkeys.length){
+    const maxv=Math.max(0.000001, ...mkeys.map(k=>byModel[k]));
+    costRank.innerHTML=mkeys.map(k=>{
+      const v=byModel[k]; const pct=Math.max(4, Math.round(v/maxv*100));
+      return `<div class="cost-row"><div class="cname" title="${k}">${k}</div><div class="cost-bar"><i style="width:${pct}%"></i></div><div class="cost-val">$${v.toFixed(4)}</div></div>`;
+    }).join("");
+  } else { costRank.innerHTML='<div class="cost-empty">暂无成本数据</div>'; }
+  renderAreaChart("trendChart", d.daily_images||[]);
+  loadAdminRecent();
+}
+function refreshDashboard(){ loadAdminStats(); showToast("数据已刷新"); }
+async function loadAdminRecent(){
+  const strip=document.getElementById("recentStrip"); if(!strip) return;
+  const res=await api("GET","/api/admin/images?page=1&page_size=8");
+  if(!res.ok){ strip.innerHTML='<div class="cost-empty">加载失败</div>'; return; }
+  const d=await res.json(); const items=d.items||[];
+  if(!items.length){ strip.innerHTML='<div class="cost-empty">暂无生成图片</div>'; return; }
+  strip.innerHTML=items.map(r=>{
+    const src=r.output_url||(r.original_urls&&r.original_urls[0])||"";
+    const when=fmt(r.created_at); const who=r.owner_username||"";
+    return `<div class="rthumb" onclick="showAdminPane('images')">
+      <div class="ri">${src?`<img src="${src}" alt="生成图" loading="lazy"/>`:'<div class="placeholder" style="height:100%"></div>'}</div>
+      <div class="rm"><div class="rt">${when}</div><div class="ru">${who}</div></div>
+    </div>`;
+  }).join("");
+}
+function openAdminLightbox(i){
+  galleryList = (admImgItems||[]).map(r => ({
+    id: r.id,
+    src: r.output_url || (r.original_urls && r.original_urls[0]) || "",
+    prompt: r.prompt || "",
+    created_at: r.created_at,
+    username: r.owner_username || ""
+  }));
+  openLightbox(i);
 }
 async function loadAdminUsers(){
   const u=await api("GET","/api/admin/users");
@@ -2653,39 +3487,69 @@ async function admDelTask(taskId){ if(!confirm("管理员确认删除该任务�
 function changeAdmPage(delta){ const next=admPage+delta; if(next>=1) loadAllTasks(next); }
 
 /* ---------- 全公司图片记录（逐张） ---------- */
+let admImgItems = [];   // 当前页图片记录（供搜索过滤与 Lightbox 导航）
 async function loadAdminImages(page){
   admImgPage=page;
   const userSel=document.getElementById("admImgUser");
   if(userSel && userSel.options.length <= 1) await loadAdminUsers();   // 首进先灌人员筛选
   const uid=userSel.value;
-  let url=`/api/admin/images?page=${page}&page_size=20`;
+  const st=document.getElementById("admImgStatus").value;
+  let url=`/api/admin/images?page=${page}&page_size=24`;
   if(uid) url+=`&user_id=${encodeURIComponent(uid)}`;
+  if(st) url+=`&status=${encodeURIComponent(st)}`;
   const res=await api("GET",url);
   if(res.status===401){ clearToken(); return location.reload(); }
   if(!res.ok){ showToast("加载图片记录失败"); return; }
   const d=await res.json();
-  const tb=document.querySelector("#adminImgTable tbody"); tb.innerHTML="";
-  d.items.forEach(it=>{
-    const orig=it.original_urls && it.original_urls.length ? it.original_urls[0] : "";
-    const origThumb = orig ? `<img class="cell-thumb" src="${orig}" onclick="openLightbox('${orig}')" alt="原图"/>` : "—";
-    const outThumb = it.output_url ? `<img class="cell-thumb" src="${it.output_url}" onclick="openLightbox('${it.output_url}')" alt="结果"/>` : (it.status==="failed"?"失败":"生成中");
-    const modeTag = it.mode==="multi_angle_fusion" ? "🅱️合成" : "🅰️单图";
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${it.owner_username}</td>
-      <td class="cell-prompt" title="${escAttr(it.prompt)}">${(it.prompt||"").slice(0,40)}${(it.prompt||"").length>40?"…":""}</td>
-      <td>${it.model||"-"}</td>
-      <td>${modeTag}</td>
-      <td>${badge(it.status)}</td>
-      <td>$${Number(it.cost_usd||0).toFixed(4)}</td>
-      <td>${fmt(it.created_at)}</td>
-      <td>${origThumb}</td>
-      <td>${outThumb}</td>`;
-    tb.appendChild(tr);
-  });
+  admImgItems = d.items || [];
+  renderAdminImgGrid();
   const pages=Math.max(1, Math.ceil(d.total/d.page_size));
   document.getElementById("admImgPageInfo").textContent=`第 ${d.page} / ${pages} 页（共 ${d.total} 张）`;
   document.getElementById("admImgPrev").disabled=d.page<=1;
   document.getElementById("admImgNext").disabled=d.page*d.page_size>=d.total;
+}
+function renderAdminImgGrid(){
+  const grid=document.getElementById("adminImgGrid"); if(!grid) return;
+  const q=document.getElementById("admImgSearch").value.trim().toLowerCase();
+  const items=admImgItems.filter(r=> !q || (r.prompt||"").toLowerCase().includes(q));
+  if(!items.length){ grid.innerHTML='<div class="empty">没有符合条件的图片</div>'; return; }
+  grid.innerHTML=items.map(r=>{
+    const src=r.output_url||(r.original_urls&&r.original_urls[0])||"";
+    const shown=(r.prompt||"(空)").toString();
+    const promptClip = shown.length>120 ? shown.slice(0,120)+"…" : shown;
+    const meta=[`🕒 ${fmt(r.created_at)}`, `👤 ${r.owner_username||""}`, r.model?`· ${r.model}`:""].filter(Boolean).join(" ");
+    return `<div class="gcard" data-id="${r.id}">
+      <div class="gcard-img">
+        ${src?`<img src="${src}" alt="生成图" loading="lazy" onclick="openAdminLightboxById('${r.id}')"/>`:`<div class="placeholder" style="height:100%">${badge(r.status)}</div>`}
+        <div class="gcard-overlay">
+          <button class="ob-btn" onclick="openAdminLightboxById('${r.id}')">查看大图</button>
+          ${src?`<button class="ob-btn" onclick="downloadImage('${src}','${r.id}')">下载</button>`:""}
+        </div>
+      </div>
+      <div class="gcard-info">
+        <div class="gcard-meta">${meta}</div>
+        <div class="gcard-prompt" title="${escAttr(shown)}">${escapeHtml(promptClip)}</div>
+        <div class="gcard-acts">
+          <button class="btn btn-ghost btn-sm" onclick="copyAdminPrompt(this,'${r.id}')">复制提示词</button>
+          ${src?`<button class="btn btn-ghost btn-sm" onclick="downloadImage('${src}','${r.id}')">下载</button>`:""}
+          <button class="btn btn-danger btn-sm" onclick="delItem('${r.id}')">删除</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+function admImgSearchDebounce(){
+  clearTimeout(window._admImgSearchT);
+  window._admImgSearchT=setTimeout(renderAdminImgGrid, 250);
+}
+function openAdminLightboxById(id){
+  const i=(admImgItems||[]).findIndex(x=>x.id===id);
+  if(i>=0) openAdminLightbox(i);
+}
+function copyAdminPrompt(btn, id){
+  const r=admImgItems.find(x=>x.id===id);
+  if(!r) return showToast("无提示词");
+  copyGalleryPrompt(btn, r.full_prompt || r.prompt || "");
 }
 function changeAdmImgPage(delta){ const next=admImgPage+delta; if(next>=1) loadAdminImages(next); }
 
@@ -2814,8 +3678,43 @@ async function testApiSettings(provider){
 }
 
 /* ---------- 灯箱 ---------- */
-function openLightbox(src){ document.getElementById("lbImg").src=src; document.getElementById("lightbox").classList.add("show"); }
-function closeLightbox(ev){ if(ev.target.id==="lightbox"||ev.target.classList.contains("lb-close")) document.getElementById("lightbox").classList.remove("show"); }
+/* ---------- 灯箱（图库大图 + 左右切换 + ESC/遮罩关闭） ---------- */
+let lbIndex = -1;
+function escHtml(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function openLightbox(arg){
+  if(typeof arg === "number"){ lbIndex = arg; }       // 图库索引：支持左右切换
+  else { galleryList = [{ id:"", src: arg, prompt:"", created_at:"", username:"" }]; lbIndex = 0; }  // 单张：无导航
+  renderLightbox();
+  document.getElementById("lightbox").classList.add("show");
+}
+function renderLightbox(){
+  const item = galleryList[lbIndex];
+  if(!item) return;
+  document.getElementById("lbImg").src = item.src || "";
+  const side = document.getElementById("lbSide");
+  const dateStr = item.created_at ? "🕒 " + fmt(item.created_at) : "";
+  const userStr = item.username ? "👤 " + item.username : "";
+  side.innerHTML =
+    (dateStr || userStr ? `<div class="lb-meta">${dateStr?`<div>${dateStr}</div>`:""}${userStr?`<div>${userStr}</div>`:""}</div>` : "") +
+    (item.prompt ? `<div class="lb-prompt">${escHtml(item.prompt)}</div>` : "") +
+    `<div class="lb-acts">` +
+      `<button class="btn btn-ghost btn-sm" onclick="copyLightboxPrompt()">复制提示词</button>` +
+      `<button class="btn btn-primary btn-sm" onclick="downloadLightboxImg()">下载图片</button>` +
+    `</div>`;
+  const single = galleryList.length <= 1;
+  document.querySelector(".lb-prev").style.display = single ? "none" : "";
+  document.querySelector(".lb-next").style.display = single ? "none" : "";
+}
+function lbStep(d){
+  if(!galleryList.length) return;
+  lbIndex = (lbIndex + d + galleryList.length) % galleryList.length;
+  renderLightbox();
+}
+function copyLightboxPrompt(){ const it = galleryList[lbIndex]; if(it) copyPrompt(it.prompt); }
+function downloadLightboxImg(){ const it = galleryList[lbIndex]; if(it) downloadImage(it.src, it.id); }
+function onLightboxBg(e){ if(e.target.id==="lightbox" || e.target.classList.contains("lb-close")) closeLightbox(); }
+function closeLightbox(){ document.getElementById("lightbox").classList.remove("show"); }
+document.addEventListener("keydown", e => { if(e.key==="Escape"){ closeLightbox(); hideConfirm(); } });
 
 /* ---------- 工具 ---------- */
 function fmt(s){ if(!s) return ""; return new Date(s).toLocaleString("zh-CN"); }
@@ -3156,9 +4055,9 @@ async function delRegCode(id){
   else { const d = await r.json().catch(()=>({})); showToast("删除失败：" + (d.detail || "")); }
 }
 
-/* 轮询：控制台仅轮询「当前任务」进度，历史列表在「我的历史」页按需加载 */
+/* 轮询：新任务创建时自动启动，无需全局预启动 */
 let pollTimer=null;
-function startPolling(){ if(pollTimer) clearInterval(pollTimer); pollTimer=setInterval(()=>{ if(!document.getElementById("tabConsole").classList.contains("hidden")){ pollCurrentTask(); } }, 3000); }
+function startPolling(){ /* 已废弃：多任务轮询由 startTaskPolling 按需启动 */ }
 
 /* ============ 主题切换：html[data-theme] = glass(默认液态) | clean(简洁) ============ */
 function themeNow(){
@@ -3186,9 +4085,96 @@ syncThemeBtn();
 /* 启动 */
 if(getToken()){ enterApp(); }
 else { document.getElementById("authOverlay").classList.remove("hidden"); }
+
+/* ===== 移动端控制台 UI 增强（≤1023px） ===== */
+function updateConsoleChrome(){ try { updateStepNav(); updateCurrentScene(); updateGenBar(); } catch(e){} }
+function updateStepNav(){
+  const s1=document.getElementById("si1"), s2=document.getElementById("si2"), s3=document.getElementById("si3");
+  if(!s1) return;
+  const sceneDone = !!selectedScene;
+  const prodDone = selectedFiles.length > 0;
+  const cur = !sceneDone ? 1 : (!prodDone ? 2 : 3);
+  [s1,s2,s3].forEach(function(el,i){
+    const n=i+1;
+    el.classList.toggle("active", n===cur);
+    el.classList.toggle("done", n<cur);
+    const dot=el.querySelector(".step-dot");
+    if(dot) dot.textContent = n<cur ? "✓" : String(n);
+  });
+}
+function updateCurrentScene(){
+  const box=document.getElementById("currentScene"); if(!box) return;
+  if(selectedScene){
+    box.classList.add("show");
+    box.innerHTML='<span class="cs-emoji">'+(selectedScene.emoji||"🖼️")+'</span><span class="cs-name">'+escapeHtml(selectedScene.name)+'</span><span class="cs-check">✓</span>';
+  } else { box.classList.remove("show"); box.innerHTML=""; }
+}
+let genBusy=false;
+function updateGenBar(){
+  const btn=document.getElementById("genBtn"); if(!btn) return;
+  if(genBusy) return;   // 生成进行中：保持「生成中…」与 spinner，不被 resetScene/renderThumbs 覆盖
+  const fee=document.getElementById("genFee");
+  if(!selectedScene){ btn.textContent="请选择场景"; btn.disabled=false; }
+  else if(selectedFiles.length===0){ btn.textContent="请上传产品图片"; btn.disabled=false; }
+  else { btn.textContent="开始生成"; btn.disabled=false; }
+  if(fee){
+    const m=(window.MODEL_CATALOG||[]).find(x=>x.id===selectedModel);
+    const fusion=(selectedMode==="multi_angle_fusion");
+    const n=fusion?(selectedFiles.length?1:0):selectedFiles.length;
+    const unit=(m&&m.unit_price_usd!=null)?m.unit_price_usd:0;
+    fee.textContent = unit>0 ? ("约 $"+(unit*n).toFixed(4)) : "免费";
+  }
+}
+async function mobileGenerate(){
+  const btn=document.getElementById("genBtn"); if(!btn||btn.disabled) return;
+  const old=btn.textContent; btn.disabled=true; genBusy=true;
+  btn.innerHTML='<span class="gen-spin"></span> 生成中…';
+  try { await createTask(); }
+  finally {
+    genBusy=false; btn.disabled=false; btn.textContent=old; updateConsoleChrome();
+    const cm=document.getElementById("createMsg");
+    if(cm && cm.style.color && cm.style.color.indexOf("239, 68, 68")>=0 && cm.textContent){ showToast(cm.textContent); }
+  }
+}
+function toggleMobileMenu(force){
+  const m=document.getElementById("mMenu"); if(!m) return;
+  const open = force!==undefined ? force : !m.classList.contains("open");
+  m.classList.toggle("open", open);
+  if(open) buildMobileMenu();
+}
+function buildMobileMenu(){
+  const m=document.getElementById("mMenu"); if(!m) return;
+  const admin = meUser && meUser.role==="admin";
+  let h="";
+  h+='<button onclick="toggleMobileMenu(false);showTab(\'history\')">🕘 我的历史</button>';
+  h+='<button onclick="toggleMobileMenu(false);openKeyModal()">🔑 API Key</button>';
+  if(admin) h+='<button onclick="toggleMobileMenu(false);showTab(\'admin\')">⚙️ 管理后台</button>';
+  h+='<div class="mm-sep"></div>';
+  h+='<button onclick="toggleMobileMenu(false);toggleTheme()">🔆 切换主题</button>';
+  h+='<div class="mm-sep"></div>';
+  h+='<button onclick="toggleMobileMenu(false);logout()">↩ 退出登录</button>';
+  m.innerHTML=h;
+}
+function setupMobileUI(){
+  document.body.classList.add("on-console");
+  const mt=document.getElementById("mTitle"); if(mt) mt.textContent="场景图片生成器";
+  document.querySelectorAll("#tabConsole .step-card").forEach(function(card){
+    const head=card.querySelector(".step-head"); if(!head) return;
+    card.classList.add("collapsible");
+    head.addEventListener("click", function(e){
+      if(e.target.closest("button, input, textarea, select")) return;
+      card.classList.toggle("collapsed");
+    });
+  });
+  document.addEventListener("click", function(e){
+    const m=document.getElementById("mMenu"); if(!m) return;
+    if(m.classList.contains("open") && !e.target.closest("#mMenu") && !e.target.closest("#mMoreBtn")) m.classList.remove("open");
+  });
+}
+setupMobileUI();
 </script>
 <!-- ★ 版本水印（纯静态，不依赖 JS/接口）：任何设备截图一眼可核对"页面是不是服务器最新版"。
      看不到水印 = 该设备拿到的 HTML 不是服务器当前这份。每次改版更新此时间戳。 -->
-<div class="ver-stamp" title="服务端页面版本标记">v3.3 · 2026-09-07 20:10</div>
+<div class="ver-stamp" title="服务端页面版本标记">v3.4 · 2026-09-08 10:45 · 移动端优先重构</div>
 </body>
 </html>

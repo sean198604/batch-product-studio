@@ -10,11 +10,12 @@ import json
 import os
 import re
 import shutil
+import time
 import zipfile
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import worker
@@ -355,21 +356,28 @@ async def create_task(
 @router.get("/my-history", response_model=PagedTasks)
 async def my_history(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(24, ge=1, le=100),
+    q: str | None = Query(None, description="按提示词(prompt/full_prompt)模糊搜索"),
+    date: str | None = Query(None, description="按生成日期 YYYY-MM-DD 过滤"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> PagedTasks:
-    total = (
-        await session.execute(
-            select(func.count(GenerationTask.id)).where(GenerationTask.user_id == user.id)
-        )
-    ).scalar() or 0
+    stmt = select(GenerationTask).where(GenerationTask.user_id == user.id)
+    # 提示词模糊搜索（prompt 或 full_prompt 任一命中）
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(GenerationTask.prompt.ilike(like), GenerationTask.full_prompt.ilike(like)))
+    # 日期过滤：按日期部分匹配（SQLite func.date 解析 ISO 日期，与时区无关）
+    if date and date.strip():
+        try:
+            stmt = stmt.where(func.date(GenerationTask.created_at) == date.strip())
+        except Exception:
+            pass
 
+    total = (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
     rows = (
         await session.execute(
-            select(GenerationTask)
-            .where(GenerationTask.user_id == user.id)
-            .order_by(desc(GenerationTask.created_at))
+            stmt.order_by(desc(GenerationTask.created_at))
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
@@ -508,6 +516,40 @@ async def delete_item(
     return {"ok": True, "deleted_item_id": item_id}
 
 
+async def _hard_delete_task(session: AsyncSession, task: GenerationTask, user: User) -> str:
+    """物理删除一个任务的全部图片 + DB 记录，并回滚累计消耗。返回 task id。"""
+    items = (
+        await session.execute(select(TaskItem).where(TaskItem.task_id == task.id))
+    ).scalars().all()
+    for item in items:
+        _remove_file(item.original_path)
+        _remove_file(item.output_path)
+        # 多角度合成：删除整组参考原图。
+        if item.original_paths:
+            try:
+                for p in json.loads(item.original_paths):
+                    _remove_file(p)
+            except Exception:
+                pass
+        await session.delete(item)
+
+    # 回滚整个任务的累计消耗（任务级 + 用户累计）。
+    if task.cost_usd:
+        owner = await session.get(User, task.user_id)
+        if owner is not None:
+            owner.total_cost_usd = max(0.0, (owner.total_cost_usd or 0.0) - task.cost_usd)
+
+    await session.delete(task)
+    return task.id
+
+
+def _post_delete_cleanup(task_id: str) -> None:
+    """删除后清理空目录与队列排序（在 commit 之后调用，不依赖 DB 会话）。"""
+    shutil.rmtree(os.path.join(settings.uploads_dir, task_id), ignore_errors=True)
+    shutil.rmtree(os.path.join(settings.outputs_dir, task_id), ignore_errors=True)
+    worker._cleanup_order(task_id)
+
+
 @router.delete("/{task_id}")
 async def delete_task(
     task_id: str,
@@ -519,30 +561,85 @@ async def delete_task(
         raise HTTPException(status_code=404, detail="Task not found.")
     _assert_owner_or_admin(task, user)
 
-    items = (
-        await session.execute(select(TaskItem).where(TaskItem.task_id == task_id))
-    ).scalars().all()
-    for item in items:
-        _remove_file(item.original_path)
-        _remove_file(item.output_path)
-        await session.delete(item)
-
-    # 回滚整个任务的累计消耗（任务级 + 用户累计）。
-    if task.cost_usd:
-        owner = await session.get(User, task.user_id)
-        if owner is not None:
-            owner.total_cost_usd = max(0.0, (owner.total_cost_usd or 0.0) - task.cost_usd)
-
-    await session.delete(task)
+    tid = await _hard_delete_task(session, task, user)
     await session.commit()
+    _post_delete_cleanup(tid)
+    return {"ok": True, "deleted_task_id": tid}
 
-    # Remove now-empty task directories.
-    shutil.rmtree(os.path.join(settings.uploads_dir, task_id), ignore_errors=True)
-    shutil.rmtree(os.path.join(settings.outputs_dir, task_id), ignore_errors=True)
-    # Drop from queue ordering if present.
-    worker._cleanup_order(task_id)
 
-    return {"ok": True, "deleted_task_id": task_id}
+# --------------------------------------------------------------------------- #
+# Batch operations (minimal endpoints for the gallery UI)
+# --------------------------------------------------------------------------- #
+@router.post("/batch-delete")
+async def batch_delete(
+    payload: dict = Body(...),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """批量删除任务（每任务 = 一张图）。仅删除属主自己的任务，管理员可删任意。"""
+    ids = payload.get("ids") or []
+    if not isinstance(ids, list):
+        ids = []
+    deleted = []
+    for tid in ids:
+        task = await session.get(GenerationTask, tid)
+        if task is None:
+            continue
+        if user.role != "admin" and task.user_id != user.id:
+            continue
+        await _hard_delete_task(session, task, user)
+        deleted.append(tid)
+    await session.commit()
+    for tid in deleted:
+        _post_delete_cleanup(tid)
+    return {"ok": True, "deleted": deleted}
+
+
+@router.post("/batch-download-zip")
+async def batch_download_zip(
+    payload: dict = Body(...),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """批量打包下载：把选中的若干任务中「成功」的生成图打包成 ZIP。"""
+    ids = payload.get("ids") or []
+    if not isinstance(ids, list):
+        ids = []
+    buffer = io.BytesIO()
+    written = 0
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for tid in ids:
+            task = await session.get(GenerationTask, tid)
+            if task is None:
+                continue
+            if user.role != "admin" and task.user_id != user.id:
+                continue
+            items = (
+                await session.execute(
+                    select(TaskItem).where(TaskItem.task_id == tid, TaskItem.status == "success")
+                )
+            ).scalars().all()
+            for idx, item in enumerate(items):
+                if not item.output_path:
+                    continue
+                abs_path = os.path.join(settings.storage_dir, item.output_path)
+                if not os.path.exists(abs_path):
+                    continue
+                arc = f"{task.id}_{idx}_{item.original_filename or 'image'}.png"
+                zf.write(abs_path, arcname=arc)
+                written += 1
+    if written == 0:
+        raise HTTPException(status_code=404, detail="选中任务中暂无可下载的生成图片。")
+    buffer.seek(0)
+
+    def _iter() -> bytes:
+        buffer.seek(0)
+        while chunk := buffer.read(65536):
+            yield chunk
+
+    ts = int(time.time())
+    headers = {"Content-Disposition": f'attachment; filename="images_{ts}.zip"'}
+    return StreamingResponse(_iter(), media_type="application/zip", headers=headers)
 
 
 async def _recompute_task(session: AsyncSession, task: GenerationTask) -> None:

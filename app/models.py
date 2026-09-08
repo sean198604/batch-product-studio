@@ -353,6 +353,8 @@ class AdminStats(SQLModel):
     total_images_generated: int
     total_cost_usd: float = 0.0
     cost_by_model: dict = {}
+    daily_images: List[dict] = []      # 最近 7 天每日生成图片数：[{date:"YYYY-MM-DD", count:int}]
+    images_by_model: dict = {}         # 各模型生成图片数：{model: int}
 
 
 # --------------------------------------------------------------------------- #
