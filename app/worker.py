@@ -70,7 +70,8 @@ _wakeup: Optional[asyncio.Event] = None
 
 # Clients (initialised in ``start_worker``).
 _client: Optional[GeminiClient] = None
-_agnes_client: Optional[AgnesClient] = None
+_agnes_cn_client: Optional[AgnesClient] = None   # 国内站（agnes-ai.cn）
+_agnes_intl_client: Optional[AgnesClient] = None  # 国际站（agnes-ai.com）
 _semaphore: Optional[asyncio.Semaphore] = None  # global single in-flight channel
 
 # Cached at start_worker to avoid re-reading settings.
@@ -149,7 +150,8 @@ async def start_worker() -> None:
     global _wakeup, _client, _agnes_client, _semaphore, _max_concurrent
     _wakeup = asyncio.Event()
     _client = GeminiClient()
-    _agnes_client = AgnesClient()
+    _agnes_cn_client = AgnesClient(station="cn")
+    _agnes_intl_client = AgnesClient(station="intl")
     _semaphore = asyncio.Semaphore(settings.semaphore_concurrency)
     _max_concurrent = max(1, int(settings.max_concurrent_tasks))
 
@@ -344,13 +346,32 @@ async def _process(item_id: str) -> None:
         # Agnes 池中实际扣减的 Key（成功则记 last_used_at；401/403 则标失效）
         used_key = None
 
+        # 站点解析（在免费额度闸门之前确定，用于按站点隔离不限量判定）：
+        # agnes-intl-* = 国际站（agnes-ai.com），agnes-* = 国内站（agnes-ai.cn），
+        # 其余 = Gemini。国际站模型 id 在调用前剥掉 intl- 前缀还原为 agn- 原 id。
+        multi = (task.mode == "multi_angle_fusion")
+        eff_model = (task.model or "").strip() or settings_store.get_model() or ""
+        if eff_model.startswith("agnes-intl-"):
+            station = "intl"
+            use_agnes = True
+            api_model = eff_model[len("agnes-intl-"):]
+        elif eff_model.startswith("agnes-"):
+            station = "cn"
+            use_agnes = True
+            api_model = eff_model
+        else:
+            station = None
+            use_agnes = False
+            api_model = eff_model
+
         try:
             async with _semaphore:
                 # ---- 每日免费额度闸门（未绑定有效 Agnes Key 的员工适用）----
                 # 管理员与已绑定有效 Key 的用户不限量；其余用户每天最多
-                # free_daily_limit 张（北京日历日）。这里的判定是权威的：
-                # 创建任务时的预检只是提前拦截，此处保证队列堆积也不超限。
-                if user is not None and not await keypool.has_unlimited(session, user):
+                # free_daily_limit 张（北京日历日）。按 station 隔离：国际站任务
+                # 需该站点有绑定的有效 Key 才不限量。创建任务时的预检只是提前拦
+                # 截，此处保证队列堆积也不超限。
+                if user is not None and not await keypool.has_unlimited(session, user, station):
                     limit = settings_store.get_free_daily_limit()
                     if await keypool.used_today(session, user.id) >= limit:
                         raise RuntimeError(
@@ -366,21 +387,20 @@ async def _process(item_id: str) -> None:
                 # per-task model override is honoured here. The upload is
                 # re-encoded to a clean PNG first so a malformed / oddly-encoded
                 # source can't trigger Google's "Unable to process input image".
-                multi = (task.mode == "multi_angle_fusion")
-                # model 为空 = 使用后台默认模型（settings 的 gemini_model 字段，
-                # 存的是实际默认模型名，可能是 agnes-*）。路由必须按「最终生效的
-                # 模型名」判断前缀，否则 model=None 的任务会被误发到 Gemini 而 404。
-                eff_model = (task.model or "").strip() or settings_store.get_model() or ""
-                use_agnes = eff_model.startswith("agnes-")
+                # （station / use_agnes / api_model 已在上方免费额度闸门前解析。）
                 if use_agnes:
                     # Agnes 图生图：单图与多角度合成都合并进 extra_body.image。
                     # 解析本次生成使用的池 Key：自有（不限量）-> 系统 Key -> 池内轮换。
+                    # 按 station 隔离：国际站任务只用国际站 Key 池，互不串用。
                     uid = user.id if user is not None else 0
-                    used_key = await keypool.pick_pool_key(session, uid)
+                    used_key = await keypool.pick_pool_key(session, uid, station)
                     agnes_api_key = (
                         used_key.key_value
                         if used_key is not None
-                        else settings_store.get_agnes_key()
+                        else settings_store.get_agnes_key(station)
+                    )
+                    agnes_client = (
+                        _agnes_intl_client if station == "intl" else _agnes_cn_client
                     )
                     if multi:
                         src_paths = (
@@ -393,11 +413,11 @@ async def _process(item_id: str) -> None:
                     api_images = [_prepare_api_image(_abs(p)) for p in src_paths]
                     prompt_to_send = _build_prompt(task, multi)
                     try:
-                        image_bytes, mime = await _agnes_client.generate(
+                        image_bytes, mime = await agnes_client.generate(
                             prompt_to_send,
                             api_images,
-                            model=eff_model,
-                            size=settings_store.get_agnes_size_tier(),
+                            model=api_model,
+                            size=settings_store.get_agnes_size_tier(station),
                             ratio=task.ratio or "",
                             api_key=agnes_api_key,
                         )

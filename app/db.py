@@ -79,6 +79,7 @@ async def _migrate() -> None:
         ("task_items", "original_paths", "TEXT"),
         ("users", "total_cost_usd", "REAL"),
         ("users", "note", "VARCHAR"),
+        ("api_keys", "station", "VARCHAR"),
     ]
     # Rows that predate a migration keep NULL in the new numeric columns.
     # ``UserRead``/``TaskSummary`` etc. require ``float`` (not None), so a NULL
@@ -89,6 +90,10 @@ async def _migrate() -> None:
         ("generation_tasks", "is_white_bg"),
         ("task_items", "cost_usd"),
         ("users", "total_cost_usd"),
+    ]
+    # 字符串列的旧行兜底（与数值 0.0 兜底同理，避免 NULL 引发序列化歧义）。
+    _BACKFILL_STR = [
+        ("api_keys", "station", "cn"),
     ]
     async with engine.begin() as conn:
         def _sync(sync_conn) -> None:
@@ -101,6 +106,11 @@ async def _migrate() -> None:
             for table, column in _BACKFILL_ZERO:
                 sync_conn.execute(
                     text(f"UPDATE {table} SET {column} = 0.0 WHERE {column} IS NULL")
+                )
+            for table, column, val in _BACKFILL_STR:
+                sync_conn.execute(
+                    text(f"UPDATE {table} SET {column} = :v WHERE {column} IS NULL")
+                    .bindparams(v=val)
                 )
         await conn.run_sync(_sync)
 

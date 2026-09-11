@@ -1685,6 +1685,21 @@
                       <div class="mc-row1"><span class="mc-name">Agnes 2.0</span><span class="mc-meta-right"><span class="mc-pri">免费</span></span></div>
                       <span class="mc-check"></span>
                     </button>
+                    <button type="button" class="mcard brand-cyan" data-mid="agnes-intl-image-2.0-flash" onclick="selectModel('agnes-intl-image-2.0-flash')" title="Agnes 国际 2.0 — 国际站 apihub.agnes-ai.com（国内网络需出口可达）">
+                      <span class="mc-avatar"></span>
+                      <div class="mc-row1"><span class="mc-name">Agnes 国际 2.0</span><span class="mc-meta-right"><span class="mc-pri">免费</span><span class="mc-station">国际</span></span></div>
+                      <span class="mc-check"></span>
+                    </button>
+                    <button type="button" class="mcard brand-blue" data-mid="agnes-intl-image-2.1-flash" onclick="selectModel('agnes-intl-image-2.1-flash')" title="Agnes 国际 2.1 — 国际站 apihub.agnes-ai.com（国内网络需出口可达）">
+                      <span class="mc-avatar"></span>
+                      <div class="mc-row1"><span class="mc-name">Agnes 国际 2.1</span><span class="mc-meta-right"><span class="mc-pri">免费</span><span class="mc-station">国际</span></span></div>
+                      <span class="mc-check"></span>
+                    </button>
+                    <button type="button" class="mcard brand-purple" data-mid="agnes-intl-image-2.5-flash" onclick="selectModel('agnes-intl-image-2.5-flash')" title="Agnes 国际 2.5 — 国际站旗舰（国内网络需出口可达）">
+                      <span class="mc-avatar"></span>
+                      <div class="mc-row1"><span class="mc-name">Agnes 国际 2.5</span><span class="mc-meta-right"><span class="mc-pri">免费</span><span class="mc-station">国际</span></span></div>
+                      <span class="mc-check"></span>
+                    </button>
                   </div>
                   <div class="set-row-more" id="modelMoreWrap" style="display:none;">
                     <select id="modelMore" class="mini-select" onchange="selectModel(this.value)"></select>
@@ -1919,6 +1934,48 @@
                 </div>
               </section>
 
+              <!-- Agnes AI 配置（国际站） -->
+              <section class="adm-pane hidden" data-pane="agnes-intl">
+                <div class="glass-card">
+                  <div class="card-title">Agnes AI 配置（<em class="title-tag">图生图 · 国际站</em>）</div>
+                  <div class="card-sub">粘贴 Agnes 国际站 API Key 与海外节点地址（<code>apihub.agnes-ai.com</code>），保存后立即生效（无需重启）。模型与提示词与国内站完全一致，仅端点与 Key 不同；<b>国内网络调用国际站需出口可达 / 代理</b>。当前官方免费。</div>
+                  <div class="form-grid">
+                    <label class="field">
+                      <span class="field-label">Agnes 国际站 Key</span>
+                      <input type="password" id="agnesIntlKey" placeholder="粘贴你的 Agnes 国际站 API Key" autocomplete="off"/>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">国际站节点（Base URL）</span>
+                      <input type="text" id="agnesIntlBase" placeholder="https://apihub.agnes-ai.com/v1"/>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">账户档位（RPM 配额）</span>
+                      <select id="agnesIntlTier" onchange="updateAgnesIntlRpmHint()">
+                        <option value="default">默认 Default（1K=20 / 2K=10 / 3K·4K=1 RPM）</option>
+                        <option value="enterprise">企业版 Enterprise（1K=40 / 2K=20 / 3K·4K=1 RPM）</option>
+                        <option value="tokenplan">Token Plan（1K=100 / 2K=80 / 3K·4K=1 RPM）</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">分辨率档位（出图尺寸）</span>
+                      <select id="agnesIntlSize" onchange="updateAgnesIntlRpmHint()">
+                        <option value="1K">1K（最快，RPM 最高）</option>
+                        <option value="2K">2K</option>
+                        <option value="3K">3K（每分钟仅约 1 张）</option>
+                        <option value="4K">4K（每分钟仅约 1 张）</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p class="modal-tip" id="agnesIntlRpmHint"></p>
+                  <div class="api-actions">
+                    <button class="btn btn-primary btn-sm" onclick="saveApiSettings()">保存配置</button>
+                    <button class="btn btn-ghost btn-sm" onclick="testApiSettings('agnes-intl')">测试连接</button>
+                    <span class="api-status" id="agnesIntlStatus"></span>
+                  </div>
+                  <p class="modal-tip" id="agnesIntlKeyHint"></p>
+                </div>
+              </section>
+
               <!-- 注册邀请码 -->
               <section class="adm-pane hidden" data-pane="regcodes">
                 <div class="glass-card">
@@ -1960,7 +2017,7 @@
                     </div>
                   </div>
                   <div class="table-wrap">
-                    <table id="poolTable"><thead><tr><th>掩码 Key</th><th>归属</th><th>来源</th><th>状态</th><th>验证时间</th><th>最近使用</th><th>备注</th><th>操作</th></tr></thead><tbody></tbody></table>
+                    <table id="poolTable"><thead><tr><th>掩码 Key</th><th>归属</th><th>来源</th><th>站点</th><th>状态</th><th>验证时间</th><th>最近使用</th><th>备注</th><th>操作</th></tr></thead><tbody></tbody></table>
                   </div>
                 </div>
               </section>
@@ -1987,7 +2044,8 @@
                   <div class="card-title">快捷操作</div>
                   <div class="quick-actions">
                     <button class="qa" onclick="showAdminPane('gemini')"><span class="ico">🌐</span>Gemini 配置</button>
-                    <button class="qa" onclick="showAdminPane('agnes')"><span class="ico">🇨🇳</span>Agnes AI</button>
+                    <button class="qa" onclick="showAdminPane('agnes')"><span class="ico">🇨🇳</span>Agnes 国内</button>
+                    <button class="qa" onclick="showAdminPane('agnes-intl')"><span class="ico">🇺🇸</span>Agnes 国际</button>
                     <button class="qa" onclick="showAdminPane('users')"><span class="ico">👥</span>员工管理</button>
                     <button class="qa" onclick="showAdminPane('images')"><span class="ico">🖼️</span>图片记录</button>
                   </div>
@@ -2349,6 +2407,9 @@ const MODEL_SHORT = {
   "agnes-image-2.5-flash": "Agnes 2.5",
   "agnes-image-2.1-flash": "Agnes 2.1",
   "agnes-image-2.0-flash": "Agnes 2.0",
+  "agnes-intl-image-2.5-flash": "Agnes 国际 2.5",
+  "agnes-intl-image-2.1-flash": "Agnes 国际 2.1",
+  "agnes-intl-image-2.0-flash": "Agnes 国际 2.0",
   "gemini-2.5-flash-image": "Gemini 2.5",
   "gemini-3.1-flash-image": "Gemini 3.1",
   "gemini-3.1-flash-lite-image": "Gemini 3.1 Lite",
@@ -2362,7 +2423,8 @@ function modelMeta(m){
   const priceStr = isFree ? "免费" : "$" + m.unit_price_usd.toFixed(4);
   // 单行 chip 用：价格 + 速度提示（速度可选）
   const speed = m.speed_hint ? '<span class="mc-speed">' + escapeHtml(m.speed_hint) + '</span>' : '';
-  return '<span class="mc-pri">' + priceStr + '</span>' + speed;
+  const st = (m.station === "intl" && m.provider === "agnes") ? '<span class="mc-station">国际</span>' : '';
+  return '<span class="mc-pri">' + priceStr + '</span>' + speed + st;
 }
 function getLiteModelId(){
   const c = window.MODEL_CATALOG || [];
@@ -3624,6 +3686,14 @@ function updateAgnesRpmHint(){
   el.textContent = m ? `当前档位：稳态 ${m[1]} RPM（突发上限 ${m[0]} RPM）。系统已内置令牌桶限速，保证不超过官方配额。`
                      : "请选择账户档位与分辨率档位。";
 }
+function updateAgnesIntlRpmHint(){
+  const t=document.getElementById("agnesIntlTier").value;
+  const s=document.getElementById("agnesIntlSize").value;
+  const m=AGNES_RPM[t] && AGNES_RPM[t][s];
+  const el=document.getElementById("agnesIntlRpmHint");
+  el.textContent = m ? `当前档位：稳态 ${m[1]} RPM（突发上限 ${m[0]} RPM）。系统已内置令牌桶限速，保证不超过官方配额。`
+                     : "请选择账户档位与分辨率档位。";
+}
 async function saveApiSettings(){
   const key=document.getElementById("apiKey").value.trim();
   const base=document.getElementById("apiBase").value.trim();
@@ -3638,6 +3708,12 @@ async function saveApiSettings(){
   if(abase) body.agnes_base_url=abase;
   body.agnes_user_tier=document.getElementById("agnesTier").value;
   body.agnes_size_tier=document.getElementById("agnesSize").value;
+  const ikey=document.getElementById("agnesIntlKey").value.trim();
+  const ibase=document.getElementById("agnesIntlBase").value.trim();
+  if(ikey) body.agnes_intl_api_key=ikey;
+  if(ibase) body.agnes_intl_base_url=ibase;
+  body.agnes_intl_user_tier=document.getElementById("agnesIntlTier").value;
+  body.agnes_intl_size_tier=document.getElementById("agnesIntlSize").value;
   const dmSel=document.getElementById("agnesDefModel");
   body.agnes_default_model = dmSel ? dmSel.value : "";
   const gemChk=document.getElementById("enableGeminiChk");
@@ -3787,7 +3863,9 @@ async function saveMyKey(){
   if(btn) btn.disabled = true;
   keyStatusMsg("验证中…（会产生一次极小型免费测试图）", true);
   try{
-    const r = await api("PUT", "/api/profile/agnes-key", { json: { api_key: key } });
+    const stSel = document.getElementById("myKeyStation");
+    const station = stSel ? stSel.value : "cn";
+    const r = await api("PUT", "/api/profile/agnes-key", { json: { api_key: key, station: station } });
     if(r.status === 401){ clearToken(); return location.reload(); }
     const d = await r.json().catch(()=>({}));
     if(r.ok){
@@ -3864,6 +3942,7 @@ async function loadAdminKeys(){
       '<td class="cell-mono">' + escAttr(k.masked) + '</td>' +
       '<td>' + owner + '</td>' +
       '<td>' + (k.source === "system" ? "系统" : "员工绑定") + '</td>' +
+      '<td>' + (k.station === "intl" ? "🌐 国际" : "🇨🇳 国内") + '</td>' +
       '<td>' + st + '</td>' +
       '<td style="font-size:12px;">' + fmt(k.validated_at) + '</td>' +
       '<td style="font-size:12px;">' + fmt(k.last_used_at) + '</td>' +
@@ -3907,7 +3986,9 @@ async function doPoolImport(){
   if(!raw.length){ showToast("请先粘贴至少一个 Agnes Key"); return; }
   if(!confirm("确认将 " + raw.length + " 行作为「系统 Key」批量加入池？重复项会自动跳过。")) return;
   res.textContent = "导入中…";
-  const r = await api("POST", "/api/admin/keys/import", { json: { keys: raw } });
+  const ss = document.getElementById("newSysKeyStation");
+  const station = ss ? ss.value : "cn";
+  const r = await api("POST", "/api/admin/keys/import", { json: { keys: raw, station: station } });
   if(r.status === 401){ clearToken(); return location.reload(); }
   const d = await r.json().catch(() => ({}));
   if(r.ok){

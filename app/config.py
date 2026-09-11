@@ -32,18 +32,29 @@ class Settings(BaseSettings):
     gemini_model: str = "agnes-image-2.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    # ---------- Agnes AI (图生图，国内 .cn 节点，当前免费) ----------
-    # 国际节点 apihub.agnes-ai.com 在国内常不可达，默认用 .cn 镜像（模型名/
-    # 参数/Key 完全一致）。size 决定 RPM 上限与出图分辨率（详见 agnes.py 的
-    # RPM_MATRIX：default 1K=20、2K=10、3K/4K=1 稳态 RPM 等）。
+    # ---------- Agnes AI 国内站（agnes-ai.cn，.cn 节点，当前免费）----------
+    # 模型名 / 参数 / Key 与官方文档（https://agnes-ai.cn/zh-Hans/docs/overview）
+    # 一致；Base URL 为官方国内站 https://api.agnes-ai.cn/v1（部署历史曾用
+    # apihub.agnes-ai.cn/v1 镜像，二者均为 .cn 国内节点）。size 决定 RPM 上限
+    # 与出图分辨率（详见 agnes.py 的 RPM_MATRIX）。
+    # 前缀约定：模型 id 不含站点前缀时即国内站（如 agnes-image-2.5-flash）。
     agnes_api_key: str = ""
-    agnes_base_url: str = "https://apihub.agnes-ai.cn/v1"
+    agnes_base_url: str = "https://api.agnes-ai.cn/v1"
     agnes_size_tier: str = "1K"        # 1K / 2K / 3K / 4K（分辨率档）
     agnes_user_tier: str = "default"   # default / enterprise / tokenplan（账户档）
     # Agnes 默认模型（生成控制台默认选中，优先级高于 gemini_model）。
-    # 留空 = 不指定，控制台默认沿用 gemini_model。仅接受 Agnes 模型 id
-    # （agnes-image-*.flash）；若值不在模型目录则自动退回 gemini_model。
+    # 可为国内站模型（agnes-image-*.flash）或国际站模型（agnes-intl-image-*.flash）。
     agnes_default_model: str = ""
+
+    # ---------- Agnes AI 国际站（agnes-ai.com，海外节点）----------
+    # 与国内站同 API 形态（OpenAI 兼容、模型名一致），仅 Base URL / Key 不同。
+    # 模型 id 统一加 ``agnes-intl-`` 前缀（如 agnes-intl-image-2.5-flash），
+    # 生图时自动剥掉前缀还原为 agnes-image-2.5-flash 调用，提示词与国际站一致。
+    # 注意：国际站在国内网络常不可达，需出口可达或代理才能连通。
+    agnes_intl_api_key: str = ""
+    agnes_intl_base_url: str = "https://apihub.agnes-ai.com/v1"
+    agnes_intl_size_tier: str = "1K"
+    agnes_intl_user_tier: str = "default"
 
     # ---------- 模型开放 / 免费额度 ----------
     # Gemini 模型默认隐藏：仅当管理员在后台开启 enable_gemini 后，员工才

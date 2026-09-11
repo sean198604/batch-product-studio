@@ -65,40 +65,57 @@ def today_start_utc() -> datetime:
 # System-key seeding
 # --------------------------------------------------------------------------- #
 async def _seed_system_keys(session: AsyncSession) -> None:
-    """Upsert keys from settings.json into the pool (idempotent)."""
-    wanted: list[str] = []
-    k1 = settings_store.get_agnes_key().strip()
-    if k1:
-        wanted.append(k1)
-    for k in settings_store.get_agnes_extra_keys():
+    """Upsert keys from settings.json into the pool (idempotent).
+
+    同时处理国内站（agnes_*）与国际站（agnes_intl_*）两套系统 Key，
+    各自带 station 标记后入库，互不串用。
+    """
+    # (station, [key, ...])：两套配置分别播种。
+    wanted_by_station: "dict[str, list[str]]" = {
+        "cn": [],
+        "intl": [],
+    }
+    for k in (settings_store.get_agnes_key().strip(), *settings_store.get_agnes_extra_keys()):
         if k:
-            wanted.append(k)
-    if not wanted:
+            wanted_by_station["cn"].append(k)
+    for k in (settings_store.get_agnes_key("intl").strip(), *settings_store.get_agnes_extra_keys("intl")):
+        if k:
+            wanted_by_station["intl"].append(k)
+    if not any(wanted_by_station.values()):
         return
-    existing = (
-        await session.execute(
-            select(ApiKey).where(
-                ApiKey.provider == "agnes",
-                ApiKey.source == "system",
-                ApiKey.key_value.in_(wanted),
-            )
-        )
-    ).scalars().all()
-    have = {row.key_value for row in existing}
-    for raw in wanted:
-        if raw in have:
+    for station, wanted in wanted_by_station.items():
+        if not wanted:
             continue
-        session.add(
-            ApiKey(
-                provider="agnes",
-                source="system",
-                key_value=raw,
-                status="valid",  # admin 提供即视为可用；可在后台逐条测试
-                note=_SYSTEM_CFG_NOTE,
-                validated_at=_utcnow(),
+        existing = (
+            await session.execute(
+                select(ApiKey).where(
+                    ApiKey.provider == "agnes",
+                    ApiKey.source == "system",
+                    ApiKey.station == station,
+                    ApiKey.key_value.in_(wanted),
+                )
             )
-        )
-        logger.info("Seeded system Agnes key into pool: %s", settings_store.mask_key(raw))
+        ).scalars().all()
+        have = {row.key_value for row in existing}
+        for raw in wanted:
+            if raw in have:
+                continue
+            session.add(
+                ApiKey(
+                    provider="agnes",
+                    source="system",
+                    station=station,
+                    key_value=raw,
+                    status="valid",  # admin 提供即视为可用；可在后台逐条测试
+                    note=_SYSTEM_CFG_NOTE,
+                    validated_at=_utcnow(),
+                )
+            )
+            logger.info(
+                "Seeded system Agnes %s key into pool: %s",
+                "国际站" if station == "intl" else "国内站",
+                settings_store.mask_key(raw),
+            )
     await session.commit()
 
 
@@ -108,11 +125,14 @@ async def sync_system_keys_from_settings() -> None:
         await _seed_system_keys(session)
         # Clean up rows that were seeded from config but whose config entry was
         # later replaced/removed. Manually-added rows ("后台添加") are kept.
-        cfg_keys: set[str] = set()
-        k1 = settings_store.get_agnes_key().strip()
-        if k1:
-            cfg_keys.add(k1)
-        cfg_keys.update(settings_store.get_agnes_extra_keys())
+        # 按 station 分别比对：国内站配置只清国内站的 stale 行，国际站同理。
+        cfg_keys: "dict[str, set[str]]" = {"cn": set(), "intl": set()}
+        for k in (settings_store.get_agnes_key().strip(), *settings_store.get_agnes_extra_keys()):
+            if k:
+                cfg_keys["cn"].add(k)
+        for k in (settings_store.get_agnes_key("intl").strip(), *settings_store.get_agnes_extra_keys("intl")):
+            if k:
+                cfg_keys["intl"].add(k)
         stale = (
             await session.execute(
                 select(ApiKey).where(
@@ -123,9 +143,10 @@ async def sync_system_keys_from_settings() -> None:
             )
         ).scalars().all()
         for row in stale:
-            if row.key_value not in cfg_keys:
+            station = row.station or "cn"
+            if row.key_value not in cfg_keys.get(station, set()):
                 await session.delete(row)
-                logger.info("Removed stale system Agnes key %s from pool", row.id)
+                logger.info("Removed stale system Agnes %s key %s from pool", station, row.id)
         await session.commit()
 
 
@@ -133,17 +154,24 @@ async def sync_system_keys_from_settings() -> None:
 # Key resolution for generation
 # --------------------------------------------------------------------------- #
 async def own_valid_key(
-    session: AsyncSession, user_id: int
+    session: AsyncSession, user_id: int, station: "str | None" = None
 ) -> "ApiKey | None":
-    """The caller's own validated pool key, if any."""
+    """The caller's own validated pool key, if any.
+
+    *station* 限定站点（"cn"/"intl"）；为 None 时返回任意站点的首个有效 Key
+    （用于「我的 API Key」展示用户已绑定的 Key 及其站点）。
+    """
+    conds = [
+        ApiKey.provider == "agnes",
+        ApiKey.owner_user_id == user_id,
+        ApiKey.status == "valid",
+    ]
+    if station is not None:
+        conds.append(ApiKey.station == station)
     row = (
         await session.execute(
             select(ApiKey)
-            .where(
-                ApiKey.provider == "agnes",
-                ApiKey.owner_user_id == user_id,
-                ApiKey.status == "valid",
-            )
+            .where(*conds)
             .order_by(ApiKey.id.desc())
             .limit(1)
         )
@@ -152,10 +180,14 @@ async def own_valid_key(
 
 
 async def pick_pool_key(
-    session: AsyncSession, user_id: int
+    session: AsyncSession, user_id: int, station: str = "cn"
 ) -> "ApiKey | None":
-    """Choose the key to charge one generation to (own -> system -> pool LRU)."""
-    own = await own_valid_key(session, user_id)
+    """Choose the key to charge one generation to (own -> system -> pool LRU).
+
+    仅在本 *station* 的 Key 池内解析：国内站任务用国内站 Key，国际站任务用
+    国际站 Key，互不串用。
+    """
+    own = await own_valid_key(session, user_id, station)
     if own is not None:
         return own
     rows = (
@@ -163,6 +195,7 @@ async def pick_pool_key(
             select(ApiKey)
             .where(
                 ApiKey.provider == "agnes",
+                ApiKey.station == station,
                 ApiKey.status == "valid",
             )
             .order_by(
@@ -193,11 +226,15 @@ async def mark_key_invalid(
 # --------------------------------------------------------------------------- #
 # Daily quota
 # --------------------------------------------------------------------------- #
-async def has_unlimited(session: AsyncSession, user: User) -> bool:
-    """Admins and staff with a bound valid key are not subject to the cap."""
+async def has_unlimited(session: AsyncSession, user: User, station: str = "cn") -> bool:
+    """Admins and staff with a bound valid key are not subject to the cap.
+
+    不限量判定按 *station* 隔离：绑定了国内站 Key 只解锁国内站不限量；
+    国际站任务仍需该站点有绑定的有效 Key（或系统 Key）。
+    """
     if user.role == "admin":
         return True
-    return await own_valid_key(session, user.id) is not None
+    return await own_valid_key(session, user.id, station) is not None
 
 
 async def used_today(session: AsyncSession, user_id: int) -> int:
@@ -227,15 +264,17 @@ async def quota_state(session: AsyncSession, user: User) -> dict:
     }
 
 
-async def pool_summary() -> dict:
-    """Public, non-secret pool metrics (valid/system/user key counts)."""
+async def pool_summary(station: "str | None" = None) -> dict:
+    """Public, non-secret pool metrics (valid/system/user key counts).
+
+    *station* 限定统计某站点（"cn"/"intl"）；为 None 时统计全部 Agnes Key。
+    """
     async with async_session_maker() as session:
+        conds = [ApiKey.provider == "agnes", ApiKey.status == "valid"]
+        if station is not None:
+            conds.append(ApiKey.station == station)
         rows = (
-            await session.execute(
-                select(ApiKey).where(
-                    ApiKey.provider == "agnes", ApiKey.status == "valid"
-                )
-            )
+            await session.execute(select(ApiKey).where(*conds))
         ).scalars().all()
     return {
         "valid": len(rows),

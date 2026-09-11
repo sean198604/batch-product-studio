@@ -29,6 +29,7 @@ def _profile_key_info(key: "ApiKey | None") -> "ProfileKeyInfo | None":
         masked=settings_store.mask_key(key.key_value),
         status=key.status,
         source=key.source,
+        station=key.station or "cn",
         note=key.note,
         validated_at=key.validated_at,
     )
@@ -75,13 +76,18 @@ async def bind_agnes_key(
         raise HTTPException(status_code=400, detail="请粘贴 Agnes API Key。")
     if len(key) < 8:
         raise HTTPException(status_code=400, detail="Key 格式不正确（长度过短）。")
+    station = (body.station or "cn").strip()
+    if station not in ("cn", "intl"):
+        station = "cn"
 
-    probe = await probe_agnes_key(api_key=key)
+    probe = await probe_agnes_key(api_key=key, station=station)
 
     dup = (
         await session.execute(
             select(ApiKey).where(
-                ApiKey.provider == "agnes", ApiKey.key_value == key
+                ApiKey.provider == "agnes",
+                ApiKey.station == station,
+                ApiKey.key_value == key,
             )
         )
     ).scalars().first()
@@ -137,6 +143,7 @@ async def bind_agnes_key(
             ApiKey(
                 provider="agnes",
                 source="user",
+                station=station,
                 owner_user_id=user.id,
                 key_value=key,
                 status="valid",

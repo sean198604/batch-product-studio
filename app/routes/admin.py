@@ -219,8 +219,13 @@ async def put_settings(
         agnes_size_tier=body.agnes_size_tier,
         agnes_user_tier=body.agnes_user_tier,
         agnes_default_model=body.agnes_default_model,
+        # Agnes 国际站（agnes-ai.com）
+        agnes_intl_api_key=body.agnes_intl_api_key,
+        agnes_intl_base_url=body.agnes_intl_base_url,
+        agnes_intl_size_tier=body.agnes_intl_size_tier,
+        agnes_intl_user_tier=body.agnes_intl_user_tier,
     )
-    # 配置（agnes_api_key / agnes_extra_keys）变化后同步进 Key 池。
+    # 配置（agnes_api_key / agnes_intl_api_key 及 extra_keys）变化后同步进 Key 池。
     await keypool.sync_system_keys_from_settings()
     return AdminSettings(**pub)
 
@@ -233,8 +238,14 @@ async def test_settings(_admin: User = Depends(require_admin)) -> ApiTestResult:
 
 @router.post("/settings/test-agnes", response_model=ApiTestResult)
 async def test_settings_agnes(_admin: User = Depends(require_admin)) -> ApiTestResult:
-    """Validate the Agnes key with a tiny, free generation (no file saved)."""
-    return ApiTestResult(**await test_connection_agnes())
+    """Validate the Agnes 国内站 key with a tiny, free generation (no file saved)."""
+    return ApiTestResult(**await test_connection_agnes(station="cn"))
+
+
+@router.post("/settings/test-agnes-intl", response_model=ApiTestResult)
+async def test_settings_agnes_intl(_admin: User = Depends(require_admin)) -> ApiTestResult:
+    """Validate the Agnes 国际站 key with a tiny, free generation (no file saved)."""
+    return ApiTestResult(**await test_connection_agnes(station="intl"))
 
 
 # --------------------------------------------------------------------------- #
@@ -246,6 +257,7 @@ async def _pool_key_out(row: ApiKey, username: str | None) -> PoolKeyOut:
         provider=row.provider,
         owner_username=username,
         source=row.source,
+        station=row.station or "cn",
         masked=settings_store.mask_key(row.key_value),
         status=row.status,
         note=row.note,
@@ -259,16 +271,18 @@ async def _pool_key_out(row: ApiKey, username: str | None) -> PoolKeyOut:
 async def list_pool_keys(
     _admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
+    station: str | None = Query(None, description="按站点筛选 cn=国内站 / intl=国际站；留空=全部"),
 ) -> list[PoolKeyOut]:
     """Full key pool with owner username (system keys show owner NULL)."""
-    rows = (
-        await session.execute(
-            select(ApiKey, User.username)
-            .outerjoin(User, ApiKey.owner_user_id == User.id)
-            .where(ApiKey.provider == "agnes")
-            .order_by(ApiKey.source, ApiKey.id.desc())
-        )
-    ).all()
+    stmt = (
+        select(ApiKey, User.username)
+        .outerjoin(User, ApiKey.owner_user_id == User.id)
+        .where(ApiKey.provider == "agnes")
+    )
+    if station:
+        stmt = stmt.where(ApiKey.station == station)
+    stmt = stmt.order_by(ApiKey.source, ApiKey.id.desc())
+    rows = (await session.execute(stmt)).all()
     return [await _pool_key_out(row, username) for row, username in rows]
 
 
@@ -283,10 +297,15 @@ async def add_system_key(
     raw = (body.api_key or "").strip()
     if not raw:
         raise HTTPException(status_code=400, detail="请粘贴 Agnes API Key。")
+    station = (body.station or "cn").strip()
+    if station not in ("cn", "intl"):
+        station = "cn"
     dup = (
         await session.execute(
             select(ApiKey).where(
-                ApiKey.provider == "agnes", ApiKey.key_value == raw
+                ApiKey.provider == "agnes",
+                ApiKey.station == station,
+                ApiKey.key_value == raw,
             )
         )
     ).scalars().first()
@@ -297,13 +316,15 @@ async def add_system_key(
             owner = u.username if u else str(dup.owner_user_id)
         raise HTTPException(
             status_code=409,
-            detail="该 Key 已在池中（"
+            detail=("国际站" if station == "intl" else "国内站")
+            + "该 Key 已在池中（"
             + (owner or "系统")
             + " 添加），无需重复录入。",
         )
     row = ApiKey(
         provider="agnes",
         source="system",
+        station=station,
         owner_user_id=None,
         key_value=raw,
         status="valid",
@@ -337,13 +358,14 @@ async def export_pool_keys(
     buf.write("\ufeff")  # Excel 友好 BOM
     writer = csv.writer(buf)
     writer.writerow([
-        "api_key", "provider", "source", "owner", "status", "note",
+        "api_key", "provider", "station", "source", "owner", "status", "note",
         "created_at", "validated_at", "last_used_at",
     ])
     for row, username in rows:
         writer.writerow([
             row.key_value,
             row.provider,
+            row.station or "cn",
             row.source,
             username or "",
             row.status,
@@ -377,6 +399,9 @@ async def import_system_keys(
     raw_lines = body.get("keys") if isinstance(body, dict) else None
     if not isinstance(raw_lines, list):
         raise HTTPException(status_code=400, detail='请求体应为 {"keys": ["sk-…", ...]}。')
+    import_station = (body.get("station") or "cn").strip()
+    if import_station not in ("cn", "intl"):
+        import_station = "cn"
 
     existing = set(
         (await session.execute(select(ApiKey.key_value))).scalars().all()
@@ -412,6 +437,7 @@ async def import_system_keys(
             ApiKey(
                 provider="agnes",
                 source="system",
+                station=import_station,
                 owner_user_id=None,
                 key_value=key,
                 status="valid",
@@ -454,7 +480,7 @@ async def test_pool_key(
     row = await session.get(ApiKey, key_id)
     if row is None or row.provider != "agnes":
         raise HTTPException(status_code=404, detail="Key 不存在。")
-    probe = await probe_agnes_key(api_key=row.key_value)
+    probe = await probe_agnes_key(api_key=row.key_value, station=row.station or "cn")
     ok = bool(probe.get("ok"))
     auth_failed = bool(probe.get("auth_failed"))
     if ok:

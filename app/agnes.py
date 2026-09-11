@@ -184,18 +184,28 @@ class AgnesClient:
     Each Agnes *account* (i.e. each API key) carries its own official RPM
     quota, so the token bucket is keyed per API key: multiple pool keys never
     contend for the same bucket. The plan/size tiers are still global
-    (admin-configured) and read live on every request.
+    (admin-configured, per station) and read live on every request.
+
+    *station* selects which Agnes endpoint + key pool to use:
+      - ``"cn"``   (default) -> Agnes 国内站（agnes-ai.cn）
+      - ``"intl"``            -> Agnes 国际站（agnes-ai.com）
+    The two stations share the same model names and prompts; only the Base
+    URL and API Key differ.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, station: str = "cn") -> None:
+        self.station = station
         self.timeout = 120.0
         # Per-key token buckets: { "<key-hash>:<tier>:<size>": _TokenBucket }.
         self._buckets: "dict[str, _TokenBucket]" = {}
-        if not settings_store.get_agnes_key():
-            logger.warning("No system Agnes key configured - generation may fail.")
+        if not settings_store.get_agnes_key(station):
+            logger.warning(
+                "No system Agnes %s key configured - generation may fail.",
+                self.station,
+            )
 
     def _endpoint(self) -> str:
-        return f"{settings_store.get_agnes_base_url().rstrip('/')}/images/generations"
+        return f"{settings_store.get_agnes_base_url(self.station).rstrip('/')}/images/generations"
 
     async def _throttle(self, size_tier: str, api_key: str) -> None:
         """Block until this KEY is under the official per-resolution RPM.
@@ -203,7 +213,7 @@ class AgnesClient:
         Reads live settings so an admin change (plan or size) takes effect on
         the very next request. One bucket per (account, tier, size).
         """
-        user_tier = settings_store.get_agnes_user_tier()
+        user_tier = settings_store.get_agnes_user_tier(self.station)
         if user_tier not in VALID_USER_TIERS:
             user_tier = "default"
         size = (size_tier or "1K").strip() or "1K"
@@ -273,7 +283,7 @@ class AgnesClient:
         return "1:1"
 
     def _headers(self, api_key: str | None = None) -> dict:
-        key = (api_key or "").strip() or settings_store.get_agnes_key()
+        key = (api_key or "").strip() or settings_store.get_agnes_key(self.station)
         return {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
@@ -368,10 +378,13 @@ class AgnesClient:
             raise RuntimeError("未指定 Agnes 模型。")
         if not image_paths:
             raise RuntimeError("图生图需要至少 1 张参考图。")
-        key = (api_key or "").strip() or settings_store.get_agnes_key()
+        key = (api_key or "").strip() or settings_store.get_agnes_key(self.station)
         if not key:
-            raise RuntimeError("未配置可用的 Agnes API Key（池为空且无系统默认 Key）。")
-        size = (size or settings.agnes_size_tier).strip() or "1K"
+            station_label = "国际站" if self.station == "intl" else "国内站"
+            raise RuntimeError(
+                f"未配置可用的 Agnes {station_label} API Key（池为空且无系统默认 Key）。"
+            )
+        size = (size or settings_store.get_agnes_size_tier(self.station)).strip() or "1K"
         await self._throttle(size, key)
         return await self._generate(
             self._build_payload(prompt, image_paths, model, size, ratio or ""),
@@ -391,7 +404,9 @@ async def _download_url(url: str) -> Tuple[bytes, str]:
 
 
 async def probe_agnes_key(
-    api_key: str | None = None, base_url: str | None = None
+    api_key: str | None = None,
+    base_url: str | None = None,
+    station: str | None = None,
 ) -> dict:
     """Validate one Agnes key with a tiny, free 1x1 generation.
 
@@ -404,9 +419,10 @@ async def probe_agnes_key(
                       (401/403). A 429 (rate limit) or network error does NOT
                       prove the key is bad -> auth_failed stays False so callers
                       can tell "invalid key" apart from "try again later".
+    ``station``     - "intl" 用 Agnes 国际站配置（agnes-ai.com）；否则国内站。
     """
-    api_key = (api_key or "").strip() or settings_store.get_agnes_key()
-    base = (base_url or "").strip() or settings_store.get_agnes_base_url()
+    api_key = (api_key or "").strip() or settings_store.get_agnes_key(station or "cn")
+    base = (base_url or "").strip() or settings_store.get_agnes_base_url(station or "cn")
     base_url_clean = base.rstrip("/")
     if not api_key:
         return {
@@ -471,8 +487,8 @@ async def probe_agnes_key(
 
 
 async def test_connection_agnes(
-    api_key: str | None = None, base_url: str | None = None
+    api_key: str | None = None, base_url: str | None = None, station: str | None = None
 ) -> dict:
     """Back-compat wrapper: validate with the given key (or the configured one)."""
-    r = await probe_agnes_key(api_key=api_key, base_url=base_url)
+    r = await probe_agnes_key(api_key=api_key, base_url=base_url, station=station)
     return {k: r[k] for k in ("ok", "status", "message", "model_available", "model_count")}

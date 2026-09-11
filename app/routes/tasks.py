@@ -51,6 +51,21 @@ def _secure_filename(name: str) -> str:
     return name or "file.bin"
 
 
+def _station_of_model(model: str | None) -> "str | None":
+    """Derive the Agnes station from a model id (mirrors worker routing).
+
+    * ``agnes-intl-*`` -> 国际站（"intl"）
+    * ``agnes-*``       -> 国内站（"cn"）
+    * 其它（Gemini 等） -> None（不限量判定不按站点隔离）
+    """
+    m = (model or "").strip()
+    if m.startswith("agnes-intl-"):
+        return "intl"
+    if m.startswith("agnes-"):
+        return "cn"
+    return None
+
+
 def _storage_url(relative_path: str | None) -> str | None:
     return f"/storage/{relative_path}" if relative_path else None
 
@@ -238,7 +253,8 @@ async def create_task(
     # 权威判定仍在 worker 内：预检只用于尽早提示，避免排队后才失败。
     is_fusion = (mode == "multi_angle_fusion")
     if user.role != "admin":
-        own_key = await keypool.own_valid_key(session, user.id)
+        # 不限量预检按站点隔离：绑定了国际站 Key 只解锁国际站不限量。
+        own_key = await keypool.own_valid_key(session, user.id, _station_of_model(chosen_model))
         if own_key is None:
             limit = settings_store.get_free_daily_limit()
             used = await keypool.used_today(session, user.id)

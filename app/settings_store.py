@@ -38,6 +38,12 @@ _defaults = {
     "agnes_size_tier": settings.agnes_size_tier,
     "agnes_user_tier": settings.agnes_user_tier,
     "agnes_default_model": settings.agnes_default_model,
+    # Agnes 国际站（agnes-ai.com，海外节点）：独立 Key / Base URL / 档位。
+    "agnes_intl_api_key": settings.agnes_intl_api_key,
+    "agnes_intl_base_url": settings.agnes_intl_base_url,
+    "agnes_intl_size_tier": settings.agnes_intl_size_tier,
+    "agnes_intl_user_tier": settings.agnes_intl_user_tier,
+    "agnes_intl_extra_keys": [],
     # 额外的系统级 Agnes Key（数组），由管理员直接编辑 data/settings.json
     # 追加；应用启动与后台保存配置时会同步进 api_keys 池。
     "agnes_extra_keys": [],
@@ -105,24 +111,56 @@ def get_free_daily_limit() -> int:
         return settings.free_daily_limit
 
 
-def get_agnes_key() -> str:
+def _station_keys(station: str) -> dict:
+    """Map a station to its settings.json field names.
+
+    station == "intl" -> Agnes 国际站（agnes-ai.com）
+    anything else      -> Agnes 国内站（agnes-ai.cn），默认
+    """
+    if station == "intl":
+        return {
+            "key": "agnes_intl_api_key",
+            "base": "agnes_intl_base_url",
+            "size": "agnes_intl_size_tier",
+            "user": "agnes_intl_user_tier",
+            "extra": "agnes_intl_extra_keys",
+        }
+    return {
+        "key": "agnes_api_key",
+        "base": "agnes_base_url",
+        "size": "agnes_size_tier",
+        "user": "agnes_user_tier",
+        "extra": "agnes_extra_keys",
+    }
+
+
+def get_agnes_key(station: str = "cn") -> str:
     with _lock:
-        return _load().get("agnes_api_key", "") or ""
+        return _load().get(_station_keys(station)["key"], "") or ""
 
 
-def get_agnes_base_url() -> str:
+def get_agnes_base_url(station: str = "cn") -> str:
     with _lock:
-        return _load().get("agnes_base_url", settings.agnes_base_url)
+        return _load().get(
+            _station_keys(station)["base"],
+            settings.agnes_intl_base_url if station == "intl" else settings.agnes_base_url,
+        )
 
 
-def get_agnes_size_tier() -> str:
+def get_agnes_size_tier(station: str = "cn") -> str:
     with _lock:
-        return (_load().get("agnes_size_tier", settings.agnes_size_tier) or "1K").strip() or "1K"
+        return (_load().get(_station_keys(station)["size"], "1K") or "1K").strip() or "1K"
 
 
-def get_agnes_user_tier() -> str:
+def get_agnes_user_tier(station: str = "cn") -> str:
     with _lock:
-        return (_load().get("agnes_user_tier", settings.agnes_user_tier) or "default").strip() or "default"
+        return (_load().get(_station_keys(station)["user"], "default") or "default").strip() or "default"
+
+
+def get_agnes_extra_keys(station: str = "cn") -> list:
+    with _lock:
+        extra = _load().get(_station_keys(station)["extra"], []) or []
+    return [str(k).strip() for k in extra if str(k).strip()]
 
 
 def get_agnes_default_model() -> str:
@@ -146,6 +184,7 @@ def get_public() -> dict:
         data = _load()
     key = data.get("gemini_api_key", "") or ""
     agnes_key = data.get("agnes_api_key", "") or ""
+    agnes_intl_key = data.get("agnes_intl_api_key", "") or ""
     return {
         "is_key_set": bool(key),
         "key_masked": mask_key(key),
@@ -158,6 +197,12 @@ def get_public() -> dict:
         "agnes_size_tier": data.get("agnes_size_tier", settings.agnes_size_tier),
         "agnes_user_tier": data.get("agnes_user_tier", settings.agnes_user_tier),
         "agnes_default_model": data.get("agnes_default_model", settings.agnes_default_model) or "",
+        # Agnes 国际站（agnes-ai.com）
+        "agnes_intl_is_key_set": bool(agnes_intl_key),
+        "agnes_intl_key_masked": mask_key(agnes_intl_key),
+        "agnes_intl_base_url": data.get("agnes_intl_base_url", settings.agnes_intl_base_url),
+        "agnes_intl_size_tier": data.get("agnes_intl_size_tier", settings.agnes_intl_size_tier),
+        "agnes_intl_user_tier": data.get("agnes_intl_user_tier", settings.agnes_intl_user_tier),
         "free_daily_limit": data.get("free_daily_limit", settings.free_daily_limit),
     }
 
@@ -173,6 +218,12 @@ def update(
     agnes_user_tier: str | None = None,
     agnes_default_model: str | None = None,
     agnes_extra_keys: list | None = None,
+    # Agnes 国际站（agnes-ai.com）
+    agnes_intl_api_key: str | None = None,
+    agnes_intl_base_url: str | None = None,
+    agnes_intl_size_tier: str | None = None,
+    agnes_intl_user_tier: str | None = None,
+    agnes_intl_extra_keys: list | None = None,
 ) -> dict:
     """Persist admin-provided overrides. Empty strings are ignored so the
     caller can send a partial update (e.g. only change the model)."""
@@ -200,5 +251,17 @@ def update(
         if agnes_extra_keys is not None:
             clean = [str(k).strip() for k in agnes_extra_keys if str(k).strip()]
             data["agnes_extra_keys"] = clean
+        # ---- Agnes 国际站 ----
+        if agnes_intl_api_key is not None and agnes_intl_api_key.strip():
+            data["agnes_intl_api_key"] = agnes_intl_api_key.strip()
+        if agnes_intl_base_url is not None and agnes_intl_base_url.strip():
+            data["agnes_intl_base_url"] = agnes_intl_base_url.strip().rstrip("/")
+        if agnes_intl_size_tier is not None and agnes_intl_size_tier.strip():
+            data["agnes_intl_size_tier"] = agnes_intl_size_tier.strip().upper()
+        if agnes_intl_user_tier is not None and agnes_intl_user_tier.strip():
+            data["agnes_intl_user_tier"] = agnes_intl_user_tier.strip().lower()
+        if agnes_intl_extra_keys is not None:
+            clean = [str(k).strip() for k in agnes_intl_extra_keys if str(k).strip()]
+            data["agnes_intl_extra_keys"] = clean
         _save(data)
         return get_public()

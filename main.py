@@ -169,6 +169,11 @@ async def public_config() -> dict:
         # 免费额度与 Key 池概况（非敏感）：未绑定 Key 的员工每天免费 N 张
         "free_daily_limit": settings_store.get_free_daily_limit(),
         "agnes_pool": await keypool.pool_summary(),
+        # 两套 Agnes 站点各自是否已配置 Key（控制台据此显示连接状态 / 是否可选）
+        "agnes_cn_is_key_set": settings_store.get_public()["agnes_is_key_set"],
+        "agnes_intl_is_key_set": settings_store.get_public()["agnes_intl_is_key_set"],
+        "agnes_pool_cn": await keypool.pool_summary(station="cn"),
+        "agnes_pool_intl": await keypool.pool_summary(station="intl"),
         # 节日/季节主题目录（供管理后台与调试查看），前端主入口已改用 scenes 列表
         "themes": scenes.theme_catalog(),
     }

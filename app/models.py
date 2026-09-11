@@ -135,6 +135,8 @@ class ApiKey(SQLModel, table=True):
         default=None, foreign_key="users.id", index=True
     )
     source: str = Field(default="user")  # user | system
+    # 站点：cn=国内站（agnes-ai.cn）/ intl=国际站（agnes-ai.com）。缺省 cn 兼容旧行。
+    station: str = Field(default="cn", index=True)
     key_value: str = Field(unique=True, index=True)
     status: str = Field(default="valid")  # valid | invalid
     note: Optional[str] = None
@@ -200,6 +202,7 @@ class ProfileKeyInfo(SQLModel):
     masked: str = ""
     status: str = ""
     source: str = ""
+    station: str = "cn"                 # cn=国内站 / intl=国际站
     note: Optional[str] = None
     validated_at: Optional[datetime] = None
 
@@ -216,6 +219,7 @@ class MyProfile(SQLModel):
 
 class ProfileKeyUpdate(SQLModel):
     api_key: str
+    station: str = "cn"                # cn=国内站 / intl=国际站
 
 
 # ---- admin key-pool views ----
@@ -224,6 +228,7 @@ class PoolKeyOut(SQLModel):
     provider: str
     owner_username: Optional[str] = None  # None = 系统 Key
     source: str
+    station: str = "cn"               # cn=国内站 / intl=国际站
     masked: str
     status: str
     note: Optional[str] = None
@@ -235,6 +240,7 @@ class PoolKeyOut(SQLModel):
 class PoolKeyAddBody(SQLModel):
     api_key: str
     note: Optional[str] = None
+    station: str = "cn"                # cn=国内站 / intl=国际站
 
 
 class PoolTestResult(SQLModel):
@@ -377,6 +383,12 @@ class AdminSettings(SQLModel):
     agnes_user_tier: str = "default" # default / enterprise / tokenplan
     # Agnes 默认模型 id（生成控制台默认选中）；空 = 不指定（跟随 gemini_model）
     agnes_default_model: str = ""
+    # ---- Agnes 国际站（agnes-ai.com，独立 Key / 节点）----
+    agnes_intl_is_key_set: bool = False
+    agnes_intl_key_masked: str = ""
+    agnes_intl_base_url: str = ""
+    agnes_intl_size_tier: str = "1K"
+    agnes_intl_user_tier: str = "default"
 
 
 class AdminSettingsUpdate(SQLModel):
@@ -391,6 +403,11 @@ class AdminSettingsUpdate(SQLModel):
     agnes_size_tier: Optional[str] = None
     agnes_user_tier: Optional[str] = None
     agnes_default_model: Optional[str] = None
+    # Agnes 国际站
+    agnes_intl_api_key: Optional[str] = None
+    agnes_intl_base_url: Optional[str] = None
+    agnes_intl_size_tier: Optional[str] = None
+    agnes_intl_user_tier: Optional[str] = None
 
 
 class ApiTestResult(SQLModel):

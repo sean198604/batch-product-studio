@@ -39,6 +39,7 @@ class ModelPrice:
     description: str = ""        # 适用场景与推荐使用时机
     note: str = ""
     provider: str = "gemini"     # gemini | agnes，前端据此分组 / 走不同客户端
+    station: str = ""            # 站点：""=Gemini / "cn"=Agnes 国内站 / "intl"=Agnes 国际站
     brand: str = ""              # 前端卡片左上的圆形品牌色（"purple|pink|blue|cyan|amber|emerald" 之一）
     icon_letter: str = ""        # 圆形品牌图标的字母（保留字段供扩展使用；当前前端不渲染，避免抓版本号数字变成无意义字符）
     speed_hint: str = ""         # 速度文案（如 "~10s/张"），用于卡片底行展示
@@ -141,6 +142,47 @@ MODEL_PRICING: dict[str, ModelPrice] = {
         note="官方当前免费（$0），本次生成不计费；RPM 按分辨率档：1K≈20 / 2K≈10 / 3K·4K≈1。",
         brand="purple", icon_letter="", speed_hint="~14s/张",
     ),
+    # ---- Agnes AI 国际站（agnes-ai.com，海外节点，当前官方免费 $0）----
+    # 模型 id 统一加 ``agnes-intl-`` 前缀；提示词与国内站完全一致（仅端点/Key 不同）。
+    "agnes-intl-image-2.0-flash": ModelPrice(
+        id="agnes-intl-image-2.0-flash",
+        label="Agnes Image 2.0 Flash（图生图 · 国际站 · 免费）",
+        input_per_1m=0.0,
+        output_per_1m=0.0,
+        output_tokens_1k=0,
+        provider="agnes",
+        station="intl",
+        tag="🆓 Agnes 国际站图生图",
+        description="Agnes AI 图生图（agnes-image-2.0-flash）经国际站 apihub.agnes-ai.com 调用，当前免费。编辑保真强，擅长局部修图 / 换背景 / 原图微调。",
+        note="国际站官方当前免费（$0），本次生成不计费；国内网络需出口可达/代理。",
+        brand="cyan", icon_letter="", speed_hint="~12s/张",
+    ),
+    "agnes-intl-image-2.1-flash": ModelPrice(
+        id="agnes-intl-image-2.1-flash",
+        label="Agnes Image 2.1 Flash（图生图 · 国际站 · 免费）",
+        input_per_1m=0.0,
+        output_per_1m=0.0,
+        output_tokens_1k=0,
+        provider="agnes",
+        station="intl",
+        tag="🆓 Agnes 国际站免费图生图",
+        description="Agnes AI 图生图（agnes-image-2.1-flash）经国际站 apihub.agnes-ai.com 调用，当前免费。适合白底产品图转场景图、多角度融合。",
+        note="国际站官方当前免费（$0），本次生成不计费；国内网络需出口可达/代理。",
+        brand="blue", icon_letter="", speed_hint="~10s/张",
+    ),
+    "agnes-intl-image-2.5-flash": ModelPrice(
+        id="agnes-intl-image-2.5-flash",
+        label="Agnes Image 2.5 Flash（图生图 · 国际站 · 免费 · 更高质）",
+        input_per_1m=0.0,
+        output_per_1m=0.0,
+        output_tokens_1k=0,
+        provider="agnes",
+        station="intl",
+        tag="🆓 Agnes 国际站高质图生图",
+        description="Agnes AI 图生图旗舰（agnes-image-2.5-flash）经国际站 apihub.agnes-ai.com 调用，当前免费。质量优于 2.1，推荐用于结构复杂、含微小文字/Logo 的高质量场景渲染。",
+        note="国际站官方当前免费（$0），本次生成不计费；国内网络需出口可达/代理。",
+        brand="purple", icon_letter="", speed_hint="~14s/张",
+    ),
 }
 
 
@@ -172,6 +214,7 @@ def catalog() -> list[dict]:
                 "tag": p.tag,
                 "description": p.description,
                 "provider": p.provider,
+                "station": p.station,
                 "unit_price_usd": p.unit_price_usd,
                 "unit_price_cny": p.unit_price_cny,
                 "note": p.note,
