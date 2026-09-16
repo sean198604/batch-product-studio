@@ -147,7 +147,7 @@ def _build_prompt(task, multi: bool) -> str:
 
 async def start_worker() -> None:
     """Bootstrap the parallel-pool worker fan-out."""
-    global _wakeup, _client, _agnes_client, _semaphore, _max_concurrent
+    global _wakeup, _client, _agnes_cn_client, _agnes_intl_client, _semaphore, _max_concurrent
     _wakeup = asyncio.Event()
     _client = GeminiClient()
     _agnes_cn_client = AgnesClient(station="cn")
