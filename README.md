@@ -1,5 +1,3 @@
-<p align="center"><img src="assets/readme-cover.png" alt="Batch Product Studio project cover" width="100%" /></p>
-
 <div align="center">
 
 # batch-product-studio · 批量产品场景图生成器
