@@ -67,7 +67,7 @@ uvicorn main:app --host 0.0.0.0 --port 7021 --workers 1
 ![控制台](docs/screenshots/console.png)
 
 > 一屏完成：**选模型 → 选模式 / 比例 → 选场景预设 / 镜头 / 光影 → 写统一提示词 → 拖入多张白底图 → 开始生成**。
-> 场景预设库内置 12+ 个电商常用场景（极简白底 / 温暖现代室内 / 自然林间原木 / 户外露营木台 …）和 4 种光影氛围，点击即填入提示词。
+> 场景预设库内置 20 个电商常用场景（极简白底 / 温暖现代室内 / 自然林间原木 / 户外露营木台 …）和 4 种光影氛围，点击即填入提示词。
 
 ### 管理后台 — 用量统计与 API 配置
 
@@ -128,9 +128,9 @@ uvicorn main:app --host 0.0.0.0 --port 7021 --workers 1
 - `DELETE /api/tasks/{id}`：级联删除该任务下所有图片与文件。
 - `GET /api/tasks/{task_id}/download-zip`：一键打包该任务所有结果图。
 
-### 🎨 前端（Liquid Glass 设计系统）
+### 🎨 前端（深海蓝企业后台 + 玻璃质感）
 
-- 顶栏 / 卡片 / 弹窗全部采用 `backdrop-filter` 液态玻璃 + 四角柔光渐变背景。
+- 顶栏 / 卡片 / 弹窗保留 `backdrop-filter` 玻璃质感，主色统一为深海蓝 `#1a365d`，去掉大面积彩色渐变。
 - 单页 SPA：登录 / 注册弹窗、批量生成控制台、个人历史（分页 / 删除）、管理员专属统计后台 Tab。
 - 移动端响应式适配（≤768px 自动调整内边距与字号）。
 
@@ -196,7 +196,7 @@ uvicorn main:app --host 0.0.0.0 --port 7021 --workers 1
 
 - **后端**：FastAPI · SQLModel · SQLite (async) · httpx · python-jose · passlib
 - **生图**：Google Gemini API（`gemini-2.5-flash-image` / Imagen 3）
-- **前端**：原生 HTML + CSS（Liquid Glass 设计系统，无框架依赖）
+- **前端**：原生 HTML + CSS（深海蓝企业后台风格 + 玻璃质感，无框架依赖）
 - **部署**：Docker · docker-compose · Bind Mount 持久化
 
 ---
@@ -245,7 +245,7 @@ Features:
 - **Two modes**: A) one scene per input; B) multi-angle / multi-ratio variants of a single input.
 - **Docker one-liner** + Bind-Mount persistence.
 
-Stack: FastAPI · SQLModel · SQLite · httpx · vanilla HTML/CSS (Liquid Glass UI).
+Stack: FastAPI · SQLModel · SQLite · httpx · vanilla HTML/CSS (glassmorphism UI, deep-navy theme).
 
 ---
 
